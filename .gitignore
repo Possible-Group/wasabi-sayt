@@ -51,3 +51,8 @@ next-env.d.ts
 # cache
 .eslintcache
 .cache/
+
+# SQLite database files
+*.db
+*.sqlite
+*.sqlite3
