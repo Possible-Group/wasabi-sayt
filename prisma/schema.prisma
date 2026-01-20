@@ -1,0 +1,182 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model BotSetting {
+  key       String  @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model CategoryEmoji {
+  id         Int      @id @default(autoincrement())
+  categoryId String   @unique
+  emoji      String
+  updatedAt  DateTime @updatedAt
+}
+
+model AdminUser {
+  id           Int      @id @default(autoincrement())
+  login        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model ClientUser {
+  id              Int      @id @default(autoincrement())
+  posterClientId  String   @unique
+  phone           String
+  phoneNormalized String   @unique
+  passwordHash    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model Order {
+  id            Int      @id @default(autoincrement())
+  externalId    String?  @unique
+  customerPhone String
+  customerName  String?
+  deliveryType  String   // delivery | pickup
+  address       String?
+  lat           Float?
+  lng           Float?
+  persons       Int      @default(1)
+  itemsJson     String
+  subtotal      Int
+  packageFee    Int
+  deliveryFee   Int
+  discount      Int      @default(0)
+  total         Int
+  status        String   @default("new")
+  createdAt     DateTime @default(now())
+}
+
+model PromoCode {
+  code     String   @id
+  type     String   // percent | fixed
+  value    Int
+  active   Boolean  @default(true)
+  startsAt DateTime?
+  endsAt   DateTime?
+}
+
+model ProductTranslation {
+  id          Int      @id @default(autoincrement())
+  productId   String   @unique
+  nameUz      String?
+  descUz      String?
+  seoTitleRu  String?
+  seoDescRu   String?
+  seoKeywordsRu String?
+  seoTitleUz  String?
+  seoDescUz   String?
+  seoKeywordsUz String?
+  hidden      Boolean  @default(false)
+  updatedAt   DateTime @updatedAt
+}
+
+model SeoMeta {
+  id            Int      @id @default(autoincrement())
+  page          String   // home, menu, product, contacts, etc
+  locale        String   // ru | uz
+  title         String?
+  description   String?
+  keywords      String?
+  ogImage       String?
+  updatedAt     DateTime @updatedAt
+
+  @@unique([page, locale])
+}
+
+model AuditLog {
+  id       Int      @id @default(autoincrement())
+  adminId  Int?
+  action   String
+  metaJson String?
+  ip       String?
+  createdAt DateTime @default(now())
+}
+
+model CategoryTranslation {
+  id          Int      @id @default(autoincrement())
+  categoryId  String   @unique
+  nameUz      String?
+  seoTitleRu  String?
+  seoDescRu   String?
+  seoKeywordsRu String?
+  seoTitleUz  String?
+  seoDescUz   String?
+  seoKeywordsUz String?
+  updatedAt   DateTime @updatedAt
+}
+
+model Banner {
+  id        Int      @id @default(autoincrement())
+  imageUrl  String
+  href      String?
+  locale    String   @default("all")
+  sortOrder Int      @default(0)
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Review {
+  id          Int      @id @default(autoincrement())
+  authorName  String
+  authorRole  String?
+  titleRu     String?
+  titleUz     String?
+  textRu      String?
+  textUz      String?
+  rating      Int      @default(5)
+  photoUrl    String?
+  publishedAt DateTime?
+  sortOrder   Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model NewsItem {
+  id               Int      @id @default(autoincrement())
+  slug             String   @unique
+  imageUrl         String
+  titleRu          String
+  titleUz          String
+  excerptRu        String
+  excerptUz        String
+  bodyRu           String
+  bodyUz           String
+  seoTitleRu       String?
+  seoDescriptionRu String?
+  seoKeywordsRu    String?
+  seoTitleUz       String?
+  seoDescriptionUz String?
+  seoKeywordsUz    String?
+  active           Boolean  @default(true)
+  publishedAt      DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
+
+model ContentPage {
+  id             Int      @id @default(autoincrement())
+  slug           String
+  locale         String
+  title          String?
+  body           String?
+  seoTitle       String?
+  seoDescription String?
+  seoKeywords    String?
+  updatedAt      DateTime @updatedAt
+
+  @@unique([slug, locale])
+}

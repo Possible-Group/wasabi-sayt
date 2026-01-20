@@ -1,0 +1,1 @@
+self.__NEXT_FONT_MANIFEST='{"pages":{},"app":{"/Users/mycomp/Documents/IT/Projects/wasabi/wasabi-sayt-2/app/layout":["static/media/48e2044251ef3125-s.p.woff2","static/media/904be59b21bd51cb-s.p.woff2","static/media/48e2044251ef3125-s.p.woff2","static/media/904be59b21bd51cb-s.p.woff2"]},"appUsingSizeAdjust":true,"pagesUsingSizeAdjust":false}';
