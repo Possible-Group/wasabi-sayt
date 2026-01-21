@@ -17,7 +17,7 @@ export async function GET(req: Request) {
   }
 
   const raw = await posterFetch<any>("menu.getProducts", { category_id });
-  let mapped = mapPosterProducts(raw);
+  let mapped = mapPosterProducts(raw, { includeOff: includeHidden });
 
   if (!category_id && mapped.length === 0) {
     const catsRaw = await posterFetch<any>("menu.getCategories");
@@ -35,7 +35,7 @@ export async function GET(req: Request) {
     );
     mapped = perCat.flatMap((res, idx) => {
       if (!res) return [];
-      const list = mapPosterProducts(res);
+      const list = mapPosterProducts(res, { includeOff: includeHidden });
       if (!list.length) return [];
       const catId = ids[idx];
       return list.map((p: any) => (p.category_id ? p : { ...p, category_id: catId }));

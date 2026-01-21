@@ -68,6 +68,16 @@ function trimName(value: any): string {
   return idx >= 0 ? name.slice(0, idx).trim() : name;
 }
 
+function hasOffMarker(value: any): boolean {
+  if (typeof value !== "string") return false;
+  return value.toLowerCase().includes("&off");
+}
+
+function isOffProduct(p: any): boolean {
+  if (!p || typeof p !== "object") return false;
+  return hasOffMarker(p.product_name) || hasOffMarker(p.name);
+}
+
 function normalizeCategoryId(value: any): string | null {
   if (value === null || value === undefined) return null;
   const id = String(value).trim();
@@ -134,10 +144,16 @@ function extractProducts(raw: any): any[] {
   return [];
 }
 
-export function mapPosterProducts(raw: any) {
+type PosterMapOptions = {
+  includeOff?: boolean;
+};
+
+export function mapPosterProducts(raw: any, options: PosterMapOptions = {}) {
   const list = extractProducts(raw).filter(
     (p) => p && (p.product_id || p.id || p.product_name || p.name)
   );
+  const includeOff = options.includeOff === true;
+  const filtered = includeOff ? list : list.filter((p) => !isOffProduct(p));
   const base = process.env.POSTER_BASE_URL;
   let origin = "";
   if (base) {
@@ -154,7 +170,7 @@ export function mapPosterProducts(raw: any) {
     return v;
   };
 
-  return list.map((p: any) => {
+  return filtered.map((p: any) => {
     const originCandidates = [
       p.photo_origin,
       p.photoOrigin,
