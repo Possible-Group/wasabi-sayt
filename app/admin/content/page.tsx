@@ -249,7 +249,6 @@ export default function AdminContentPage() {
   }
 
   function addLocationFromSpot(spot: PosterSpot) {
-    if (locations.length >= 3) return;
     if (locations.some((l) => l.spotId === spot.spot_id)) return;
     setLocations((prev) => [
       ...prev,
@@ -758,10 +757,10 @@ export default function AdminContentPage() {
       <section className="admin-card stack">
         <div className="admin-inline">
           <div style={{ fontWeight: 600 }}>Локации (О нас)</div>
-          <div className="admin-pill">Выбрано: {locations.length}/3</div>
+          <div className="admin-pill">Выбрано: {locations.length}</div>
         </div>
         <p className="admin-subtitle">
-          Выберите 3 локации из Poster, задайте название и описание на RU/UZ, координаты и адрес.
+          Выберите локации из Poster, задайте название и описание на RU/UZ, координаты и адрес.
         </p>
 
         <div className="admin-grid">
@@ -937,7 +936,7 @@ export default function AdminContentPage() {
                     </div>
                     <button
                       className="admin-button"
-                      disabled={isSelected || locations.length >= 3}
+                      disabled={isSelected}
                       onClick={() => addLocationFromSpot(spot)}
                     >
                       {isSelected ? "Добавлено" : "Добавить"}
@@ -946,9 +945,6 @@ export default function AdminContentPage() {
                 );
               })}
             </div>
-            {locations.length >= 3 ? (
-              <div className="admin-subtitle">Можно выбрать максимум 3 локации.</div>
-            ) : null}
           </div>
         </div>
 

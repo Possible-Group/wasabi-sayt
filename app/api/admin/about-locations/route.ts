@@ -17,7 +17,7 @@ const LocationSchema = z.object({
 });
 
 const Body = z.object({
-  locations: z.array(LocationSchema).max(3),
+  locations: z.array(LocationSchema),
 });
 
 function parseLocations(raw?: string | null) {

@@ -215,12 +215,6 @@ export default function ProductDetail({
             <p className="product-detail__text">{product.description}</p>
           </div>
         ) : null}
-        {product.ingredients ? (
-          <div className="product-detail__section">
-            <div className="product-detail__label">{copy.ingredients}</div>
-            <p className="product-detail__text">{product.ingredients}</p>
-          </div>
-        ) : null}
 
         <div className="product-detail__actions">
           <div className="site-qty">

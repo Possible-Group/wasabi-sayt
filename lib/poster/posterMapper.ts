@@ -218,7 +218,8 @@ export function mapPosterProducts(raw: any, options: PosterMapOptions = {}) {
       photo_origin: withOrigin(photoOriginRaw),
       photo_raw: photoRaw,
       ingredients: p.ingredients ?? null,
-      description: p.description ?? null,
+      description:
+        p.product_production_description ?? p.production_description ?? p.description ?? null,
       category_name:
         p.category_name ??
         p.menu_category_name ??

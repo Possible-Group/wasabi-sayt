@@ -172,7 +172,7 @@ async function getProductPageData(locale: Locale, id: string) {
       price: Number(product.price ?? 0),
       image: product.photo_origin || product.photo || product.photo_raw || null,
       description: cleanText(description) || null,
-      ingredients: cleanText(product.ingredients) || null,
+      ingredients: null,
       categoryName: cleanText(categoryName) || null,
     },
     translation,
@@ -198,7 +198,7 @@ export async function generateMetadata({
     locale === "uz" ? translation?.seoKeywordsUz || "" : translation?.seoKeywordsRu || "";
 
   const title = seoTitle || product.name || "Wasabi";
-  const description = truncate(seoDesc || product.description || product.ingredients || "");
+  const description = truncate(seoDesc || product.description || "");
 
   return {
     title,

@@ -191,7 +191,7 @@ export default async function AboutPage({
                   </p>
                 </div>
               </div>
-              <LocationsSection locale={locale} locations={locations.slice(0, 3)} />
+              <LocationsSection locale={locale} locations={locations} />
             </div>
           </section>
         ) : null}
