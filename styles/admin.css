@@ -130,6 +130,32 @@
   color: var(--text);
   font-size:14px;
 }
+.admin-password{
+  position: relative;
+  display:flex;
+  align-items:center;
+}
+.admin-password .admin-input{
+  padding-right: 42px;
+}
+.admin-password__toggle{
+  position:absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  color: var(--muted);
+  cursor: pointer;
+}
+.admin-password__toggle svg{
+  width: 100%;
+  height: 100%;
+  display:block;
+}
 
 .admin-input[type="file"]{
   padding:6px 10px;

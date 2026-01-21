@@ -116,7 +116,7 @@ export default function AdminTranslationsPage() {
 
   useEffect(() => {
     fetch("/api/poster/products?include_hidden=1").then((r) => r.json()).then(setProducts);
-    fetch("/api/poster/categories")
+    fetch("/api/poster/categories?include_hidden=1")
       .then((r) => r.json())
       .then((rows: PosterCategory[]) => {
         const map: Record<string, string> = {};

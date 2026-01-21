@@ -10,6 +10,7 @@ function AdminLoginContent() {
 
   const [login, setLogin] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -48,13 +49,43 @@ function AdminLoginContent() {
       </label>
       <label className="admin-field">
         Пароль
-        <input
-          className="admin-input"
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          placeholder="Пароль"
-          type="password"
-        />
+        <div className="admin-password">
+          <input
+            className="admin-input"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Пароль"
+            type={showPassword ? "text" : "password"}
+          />
+          <button
+            type="button"
+            className="admin-password__toggle"
+            aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
+            aria-pressed={showPassword}
+            onClick={() => setShowPassword((prev) => !prev)}
+          >
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="1.7"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.7" />
+              {!showPassword && (
+                <path
+                  d="M4 4l16 16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                />
+              )}
+            </svg>
+          </button>
+        </div>
       </label>
 
       {err && <div className="text-error">{err}</div>}

@@ -1,12 +1,36 @@
 import { NextResponse } from "next/server";
 import { posterFetch } from "@/lib/poster/posterClient";
 import { cached } from "@/lib/poster/posterCache";
+import { requireAdmin } from "@/lib/auth/adminAuth";
 
 type PosterCategoriesResp = {
   response: any;
 };
 
-export async function GET() {
+function hasOffMarker(value: any): boolean {
+  if (typeof value !== "string") return false;
+  return value.toLowerCase().includes("&off");
+}
+
+function isHiddenCategoryName(value: any): boolean {
+  if (typeof value !== "string") return false;
+  return value.trim().toLowerCase() === "top screen";
+}
+
+function getCategoryNameRaw(c: any): string {
+  if (!c || typeof c !== "object") return "";
+  return String(c.category_name ?? c.name ?? c.title ?? "").trim();
+}
+
+export async function GET(req: Request) {
+  const { searchParams } = new URL(req.url);
+  const includeHidden = searchParams.get("include_hidden") === "1";
+
+  if (includeHidden) {
+    const session = await requireAdmin();
+    if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   const data = await cached("poster:categories", 60_000, () =>
     posterFetch<PosterCategoriesResp>("/menu.getCategories")
   );
@@ -27,7 +51,14 @@ export async function GET() {
     return v;
   };
 
-  const mapped = list.map((c: any) => ({
+  const filtered = includeHidden
+    ? list
+    : list.filter((c: any) => {
+        const name = getCategoryNameRaw(c);
+        return !hasOffMarker(name) && !isHiddenCategoryName(name);
+      });
+
+  const mapped = filtered.map((c: any) => ({
     ...c,
     photo: withOrigin(c.category_photo ?? c.photo ?? c.image),
   }));

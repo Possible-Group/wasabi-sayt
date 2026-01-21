@@ -2028,6 +2028,32 @@ textarea.checkout-input{
   font-size: 14px;
   color: var(--site-ink);
 }
+.account-password{
+  position: relative;
+  display:flex;
+  align-items:center;
+}
+.account-password .account-input{
+  padding-right: 42px;
+}
+.account-password__toggle{
+  position:absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  color: var(--site-muted);
+  cursor: pointer;
+}
+.account-password__toggle svg{
+  width: 100%;
+  height: 100%;
+  display:block;
+}
 .account-message{
   padding: 10px 12px;
   border-radius: 12px;

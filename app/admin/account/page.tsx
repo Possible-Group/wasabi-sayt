@@ -5,8 +5,10 @@ import { emitAdminToast } from "@/lib/admin/adminToast";
 
 export default function AdminAccountPage() {
   const [oldPassword, setOldPassword] = useState("");
+  const [showOldPassword, setShowOldPassword] = useState(false);
   const [newLogin, setNewLogin] = useState("");
   const [newPassword, setNewPassword] = useState("");
+  const [showNewPassword, setShowNewPassword] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -58,13 +60,43 @@ export default function AdminAccountPage() {
       <div className="admin-card stack">
         <label className="admin-field">
           Старый пароль
-          <input
-            className="admin-input"
-            placeholder="Старый пароль"
-            type="password"
-            value={oldPassword}
-            onChange={(e) => setOldPassword(e.target.value)}
-          />
+          <div className="admin-password">
+            <input
+              className="admin-input"
+              placeholder="Старый пароль"
+              type={showOldPassword ? "text" : "password"}
+              value={oldPassword}
+              onChange={(e) => setOldPassword(e.target.value)}
+            />
+            <button
+              type="button"
+              className="admin-password__toggle"
+              aria-label={showOldPassword ? "Скрыть пароль" : "Показать пароль"}
+              aria-pressed={showOldPassword}
+              onClick={() => setShowOldPassword((prev) => !prev)}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.7" />
+                {!showOldPassword && (
+                  <path
+                    d="M4 4l16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    strokeLinecap="round"
+                  />
+                )}
+              </svg>
+            </button>
+          </div>
         </label>
 
         <label className="admin-field">
@@ -79,13 +111,43 @@ export default function AdminAccountPage() {
 
         <label className="admin-field">
           Новый пароль (опционально)
-          <input
-            className="admin-input"
-            placeholder="Новый пароль"
-            type="password"
-            value={newPassword}
-            onChange={(e) => setNewPassword(e.target.value)}
-          />
+          <div className="admin-password">
+            <input
+              className="admin-input"
+              placeholder="Новый пароль"
+              type={showNewPassword ? "text" : "password"}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+            />
+            <button
+              type="button"
+              className="admin-password__toggle"
+              aria-label={showNewPassword ? "Скрыть пароль" : "Показать пароль"}
+              aria-pressed={showNewPassword}
+              onClick={() => setShowNewPassword((prev) => !prev)}
+            >
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="1.7"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+                <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.7" />
+                {!showNewPassword && (
+                  <path
+                    d="M4 4l16 16"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.7"
+                    strokeLinecap="round"
+                  />
+                )}
+              </svg>
+            </button>
+          </div>
         </label>
 
         {err && <div className="text-error">{err}</div>}

@@ -32,7 +32,7 @@ export default function AdminCategoriesPage() {
   const [savingId, setSavingId] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch("/api/poster/categories").then((r) => r.json()).then(setCategories);
+    fetch("/api/poster/categories?include_hidden=1").then((r) => r.json()).then(setCategories);
     fetch("/api/admin/category-translations")
       .then((r) => r.json())
       .then((rows: CatRow[]) => {

@@ -100,9 +100,11 @@ export default function AccountPage() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [loginPhone, setLoginPhone] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [regName, setRegName] = useState("");
   const [regPhone, setRegPhone] = useState("");
   const [regPassword, setRegPassword] = useState("");
+  const [showRegPassword, setShowRegPassword] = useState(false);
   const [regBirthday, setRegBirthday] = useState("");
 
   useEffect(() => {
@@ -289,13 +291,43 @@ export default function AccountPage() {
                       </label>
                       <label className="account-field">
                         {copy.passwordLabel}
-                        <input
-                          className="account-input"
-                          type="password"
-                          value={loginPassword}
-                          onChange={(e) => setLoginPassword(e.target.value)}
-                          placeholder={copy.passwordPlaceholder}
-                        />
+                        <div className="account-password">
+                          <input
+                            className="account-input"
+                            type={showLoginPassword ? "text" : "password"}
+                            value={loginPassword}
+                            onChange={(e) => setLoginPassword(e.target.value)}
+                            placeholder={copy.passwordPlaceholder}
+                          />
+                          <button
+                            type="button"
+                            className="account-password__toggle"
+                            aria-label={showLoginPassword ? "Скрыть пароль" : "Показать пароль"}
+                            aria-pressed={showLoginPassword}
+                            onClick={() => setShowLoginPassword((prev) => !prev)}
+                          >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                              <path
+                                d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.7"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.7" />
+                              {!showLoginPassword && (
+                                <path
+                                  d="M4 4l16 16"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.7"
+                                  strokeLinecap="round"
+                                />
+                              )}
+                            </svg>
+                          </button>
+                        </div>
                       </label>
                       {error && <div className="account-message is-error">{error}</div>}
                       <button
@@ -332,13 +364,43 @@ export default function AccountPage() {
                       </label>
                       <label className="account-field">
                         {copy.passwordLabel}
-                        <input
-                          className="account-input"
-                          type="password"
-                          value={regPassword}
-                          onChange={(e) => setRegPassword(e.target.value)}
-                          placeholder={copy.passwordPlaceholder}
-                        />
+                        <div className="account-password">
+                          <input
+                            className="account-input"
+                            type={showRegPassword ? "text" : "password"}
+                            value={regPassword}
+                            onChange={(e) => setRegPassword(e.target.value)}
+                            placeholder={copy.passwordPlaceholder}
+                          />
+                          <button
+                            type="button"
+                            className="account-password__toggle"
+                            aria-label={showRegPassword ? "Скрыть пароль" : "Показать пароль"}
+                            aria-pressed={showRegPassword}
+                            onClick={() => setShowRegPassword((prev) => !prev)}
+                          >
+                            <svg viewBox="0 0 24 24" aria-hidden="true">
+                              <path
+                                d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="1.7"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              />
+                              <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.7" />
+                              {!showRegPassword && (
+                                <path
+                                  d="M4 4l16 16"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.7"
+                                  strokeLinecap="round"
+                                />
+                              )}
+                            </svg>
+                          </button>
+                        </div>
                       </label>
                       <label className="account-field">
                         {copy.birthdayLabel}

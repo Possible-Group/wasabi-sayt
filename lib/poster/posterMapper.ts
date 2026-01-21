@@ -73,9 +73,31 @@ function hasOffMarker(value: any): boolean {
   return value.toLowerCase().includes("&off");
 }
 
+function isHiddenCategoryName(value: any): boolean {
+  if (typeof value !== "string") return false;
+  return value.trim().toLowerCase() === "top screen";
+}
+
 function isOffProduct(p: any): boolean {
   if (!p || typeof p !== "object") return false;
   return hasOffMarker(p.product_name) || hasOffMarker(p.name);
+}
+
+function getRawCategoryName(p: any): string {
+  if (!p || typeof p !== "object") return "";
+  return String(
+    p.category_name ??
+      p.menu_category_name ??
+      p.category?.category_name ??
+      p.category?.name ??
+      p.category?.title ??
+      ""
+  ).trim();
+}
+
+function isOffCategory(p: any): boolean {
+  const raw = getRawCategoryName(p);
+  return raw ? hasOffMarker(raw) || isHiddenCategoryName(raw) : false;
 }
 
 function normalizeCategoryId(value: any): string | null {
@@ -153,7 +175,7 @@ export function mapPosterProducts(raw: any, options: PosterMapOptions = {}) {
     (p) => p && (p.product_id || p.id || p.product_name || p.name)
   );
   const includeOff = options.includeOff === true;
-  const filtered = includeOff ? list : list.filter((p) => !isOffProduct(p));
+  const filtered = includeOff ? list : list.filter((p) => !isOffProduct(p) && !isOffCategory(p));
   const base = process.env.POSTER_BASE_URL;
   let origin = "";
   if (base) {
