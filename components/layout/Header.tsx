@@ -385,8 +385,10 @@ function CartIcon() {
 
 function MenuIcon() {
   return (
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
-      <path d="M4 7h16M4 12h16M4 17h16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    <svg width="18" height="18" viewBox="0 0 18 18" fill="none" aria-hidden>
+      <rect x="3" y="3" width="12" height="2" rx="1" fill="currentColor" />
+      <rect x="3" y="8" width="12" height="2" rx="1" fill="currentColor" />
+      <rect x="3" y="13" width="12" height="2" rx="1" fill="currentColor" />
     </svg>
   );
 }

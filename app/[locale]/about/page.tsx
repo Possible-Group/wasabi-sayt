@@ -50,7 +50,7 @@ const STATS_FALLBACK: AboutStatsData = {
   stats: [
     { id: "exp", value: "15+", labelRu: "Лет опыта", labelUz: "Yil tajriba" },
     { id: "menu", value: "80+", labelRu: "Позиции в меню", labelUz: "Taomlar menyuda" },
-    { id: "loc", value: "3", labelRu: "Локации", labelUz: "Lokatsiya" },
+    { id: "loc", value: "4", labelRu: "Локации", labelUz: "Lokatsiya" },
   ],
 };
 
