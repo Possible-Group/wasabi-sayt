@@ -148,8 +148,18 @@ export default function Header({ locale }: { locale: string }) {
   const searchLabel = locale === "uz" ? "Qidirish" : "Поиск";
   const clearLabel = locale === "uz" ? "Qidiruvni tozalash" : "Очистить поиск";
   const socialItems = [
-    { label: copy.sidebar.instagram, href: normalizeUrl(socialLinks.instagram) },
-    { label: copy.sidebar.telegram, href: normalizeUrl(socialLinks.telegram) },
+    {
+      id: "instagram",
+      label: copy.sidebar.instagram,
+      href: normalizeUrl(socialLinks.instagram),
+      icon: <InstagramIcon />,
+    },
+    {
+      id: "telegram",
+      label: copy.sidebar.telegram,
+      href: normalizeUrl(socialLinks.telegram),
+      icon: <TelegramIcon />,
+    },
   ].filter((item) => item.href);
 
   const renderSearch = () => (
@@ -321,8 +331,16 @@ export default function Header({ locale }: { locale: string }) {
             {socialItems.length > 0 && (
               <div className="site-mobile__social">
                 {socialItems.map((item) => (
-                  <a key={item.label} href={item.href} target="_blank" rel="noreferrer">
-                    {item.label}
+                  <a
+                    key={item.id}
+                    href={item.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className={`is-${item.id}`}
+                    aria-label={item.label}
+                    title={item.label}
+                  >
+                    {item.icon}
                   </a>
                 ))}
               </div>
@@ -389,6 +407,24 @@ function MenuIcon() {
       <rect x="3" y="3" width="12" height="2" rx="1" fill="currentColor" />
       <rect x="3" y="8" width="12" height="2" rx="1" fill="currentColor" />
       <rect x="3" y="13" width="12" height="2" rx="1" fill="currentColor" />
+    </svg>
+  );
+}
+
+function InstagramIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="3" y="3" width="18" height="18" rx="5" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.6" />
+      <circle cx="17" cy="7" r="1.3" fill="currentColor" />
+    </svg>
+  );
+}
+
+function TelegramIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M22 2 15 22 11 13 2 9 22 2Z" fill="currentColor" />
     </svg>
   );
 }

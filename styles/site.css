@@ -436,9 +436,25 @@ body.ws-body .ws-container{
   border-radius: 999px;
   border: 1px solid rgba(90,134,29,0.18);
   background: rgba(90,134,29,0.12);
-  text-align:center;
+  display:flex;
+  align-items:center;
+  justify-content:center;
   color: var(--site-ink);
   font-weight: 600;
+}
+.site-mobile__social a svg{
+  width: 20px;
+  height: 20px;
+}
+.site-mobile__social a.is-instagram{
+  color: #d6249f;
+  border-color: rgba(214,36,159,0.28);
+  background: linear-gradient(135deg, rgba(253,204,90,0.32), rgba(214,36,159,0.18));
+}
+.site-mobile__social a.is-telegram{
+  color: #2aabee;
+  border-color: rgba(42,171,238,0.28);
+  background: linear-gradient(135deg, rgba(42,171,238,0.22), rgba(120,210,248,0.18));
 }
 
 .site-closed__card > *{
