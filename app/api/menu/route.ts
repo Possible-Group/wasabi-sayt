@@ -20,6 +20,7 @@ export async function GET() {
     {
       nameUz?: string | null;
       descUz?: string | null;
+      sortOrder?: number | null;
       seoTitleRu?: string | null;
       seoDescRu?: string | null;
       seoKeywordsRu?: string | null;
@@ -33,6 +34,7 @@ export async function GET() {
     trMap[t.productId] = {
       nameUz: t.nameUz,
       descUz: t.descUz,
+      sortOrder: t.sortOrder,
       seoTitleRu: t.seoTitleRu,
       seoDescRu: t.seoDescRu,
       seoKeywordsRu: t.seoKeywordsRu,
@@ -47,6 +49,7 @@ export async function GET() {
     string,
     {
       nameUz?: string | null;
+      sortOrder?: number | null;
       seoTitleRu?: string | null;
       seoDescRu?: string | null;
       seoKeywordsRu?: string | null;
@@ -58,6 +61,7 @@ export async function GET() {
   categoryTranslations.forEach((t) => {
     catMap[t.categoryId] = {
       nameUz: t.nameUz,
+      sortOrder: t.sortOrder,
       seoTitleRu: t.seoTitleRu,
       seoDescRu: t.seoDescRu,
       seoKeywordsRu: t.seoKeywordsRu,

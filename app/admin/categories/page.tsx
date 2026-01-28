@@ -13,6 +13,7 @@ type PosterCategory = {
 type CatRow = {
   categoryId: string;
   nameUz?: string | null;
+  sortOrder?: number | null;
   seoTitleRu?: string | null;
   seoDescRu?: string | null;
   seoKeywordsRu?: string | null;
@@ -67,6 +68,7 @@ export default function AdminCategoriesPage() {
         body: JSON.stringify({
           categoryId,
           nameUz: row.nameUz || "",
+          sortOrder: row.sortOrder ?? null,
           seoTitleRu: row.seoTitleRu || "",
           seoDescRu: row.seoDescRu || "",
           seoKeywordsRu: row.seoKeywordsRu || "",
@@ -142,6 +144,21 @@ export default function AdminCategoriesPage() {
 
                 <div className="admin-card stack" style={{ boxShadow: "none" }}>
                   <div style={{ fontWeight: 600 }}>UZ (заполняем)</div>
+                  <label className="admin-field">
+                    Порядок в списке
+                    <input
+                      className="admin-input"
+                      type="number"
+                      placeholder="Например, 10"
+                      value={tr.sortOrder ?? ""}
+                      onChange={(e) => {
+                        const raw = e.target.value;
+                        const sortOrder = raw === "" ? null : Number(raw);
+                        updateTr(id, { sortOrder: Number.isFinite(sortOrder) ? sortOrder : null });
+                      }}
+                    />
+                  </label>
+                  <div className="admin-subtitle">Меньше — выше в списке.</div>
                   <label className="admin-field">
                     Название (UZ)
                     <input

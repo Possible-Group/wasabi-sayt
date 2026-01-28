@@ -372,22 +372,38 @@ export default async function HomePage({
   const uploadsOrigin = await getUploadsOrigin(origin);
   const posterOrigin = getPosterOrigin() ?? origin;
 
+  const [categoryRows, productRows, popularRow] = await Promise.all([
+    prisma.categoryTranslation.findMany({
+      select: { categoryId: true, nameUz: true, sortOrder: true },
+    }),
+    prisma.productTranslation.findMany({
+      select: { productId: true, nameUz: true, sortOrder: true },
+    }),
+    prisma.botSetting.findUnique({ where: { key: "popular_products" } }),
+  ]);
+
   const categoryNameUzMap = new Map(
-    (await prisma.categoryTranslation.findMany({ select: { categoryId: true, nameUz: true } }))
+    categoryRows
       .map((row) => [String(row.categoryId ?? "").trim(), String(row.nameUz ?? "").trim()] as const)
       .filter(([id, name]) => id && name)
   );
+  const categorySortMap = new Map(
+    categoryRows.map((row) => [String(row.categoryId ?? "").trim(), row.sortOrder ?? null] as const)
+  );
 
   const productNameUzMap = new Map(
-    (await prisma.productTranslation.findMany({ select: { productId: true, nameUz: true } }))
+    productRows
       .map((row) => [String(row.productId ?? "").trim(), String(row.nameUz ?? "").trim()] as const)
       .filter(([id, name]) => id && name)
   );
+  const productSortMap = new Map(
+    productRows.map((row) => [String(row.productId ?? "").trim(), row.sortOrder ?? null] as const)
+  );
 
-  const popularRow = await prisma.botSetting.findUnique({ where: { key: "popular_products" } });
   const popularIds = parsePopularIds(popularRow?.value);
+  const currency = locale === "uz" ? "so'm" : "сум";
 
-  const banners: Banner[] = await (async () => {
+  const bannersPromise: Promise<Banner[]> = (async () => {
     try {
       const where: any = { active: true };
       if (locale === "ru" || locale === "uz") {
@@ -433,14 +449,12 @@ export default async function HomePage({
           { id: "p6", title: "Горячий рамэн", price: "41 000 сум", image: svgDataUrl("Рамэн") },
         ];
 
-  const topProducts: ProductCard[] = await (async () => {
+  const topProductsPromise: Promise<ProductCard[]> = (async () => {
     try {
       const res = await fetch(`${origin}/api/poster/products`, { cache: "no-store" });
       if (!res.ok) throw new Error("products");
       const rows = await res.json();
       if (!Array.isArray(rows) || rows.length === 0) throw new Error("empty");
-
-      const currency = locale === "uz" ? "so'm" : "сум";
 
       const mapped = rows.map((p: any, idx: number) => {
         const id = String(p.product_id ?? p.id ?? idx).trim();
@@ -481,7 +495,8 @@ export default async function HomePage({
       return topProductsFallback;
     }
   })();
-  const categoryList: { id: string; title: string }[] = await (async () => {
+
+  const categoryListPromise: Promise<{ id: string; title: string }[]> = (async () => {
     try {
       const res = await fetch(`${origin}/api/poster/categories`, { cache: "no-store" });
       if (!res.ok) throw new Error("categories");
@@ -497,7 +512,7 @@ export default async function HomePage({
         [];
       if (!arr.length) return [];
       const normalize = (v: any) => (typeof v === "string" ? v.trim() : "");
-      return arr
+      const list = arr
         .map((c: any) => {
           const id = normalize(c?.category_id ?? c?.categoryId ?? c?.id ?? "");
           const title =
@@ -506,10 +521,34 @@ export default async function HomePage({
           return id && title ? { id, title } : null;
         })
         .filter(Boolean) as { id: string; title: string }[];
+
+      const ordered = list
+        .map((item, idx) => ({
+          ...item,
+          index: idx,
+          sortOrder: categorySortMap.get(item.id) ?? null,
+        }))
+        .sort((a, b) => {
+          const aHas = a.sortOrder !== null && a.sortOrder !== undefined;
+          const bHas = b.sortOrder !== null && b.sortOrder !== undefined;
+          if (aHas && bHas) return a.sortOrder - b.sortOrder || a.index - b.index;
+          if (aHas) return -1;
+          if (bHas) return 1;
+          return a.index - b.index;
+        })
+        .map(({ id, title }) => ({ id, title }));
+
+      return ordered;
     } catch {
       return [];
     }
   })();
+
+  const [banners, topProducts, categoryList] = await Promise.all([
+    bannersPromise,
+    topProductsPromise,
+    categoryListPromise,
+  ]);
 
   const filteredProducts = query
     ? topProducts.filter((p) => p.title.toLowerCase().includes(query))
@@ -541,6 +580,24 @@ export default async function HomePage({
     const list = grouped.get(categoryTitle) || [];
     list.push(item);
     grouped.set(categoryTitle, list);
+  }
+  const productIndex = new Map(catalogProducts.map((item, idx) => [item.id, idx] as const));
+  const getProductOrder = (item: ProductCard) => {
+    const order = productSortMap.get(item.id);
+    return typeof order === "number" ? order : null;
+  };
+  const getProductIndex = (item: ProductCard) => productIndex.get(item.id) ?? 0;
+  for (const list of grouped.values()) {
+    list.sort((a, b) => {
+      const aOrder = getProductOrder(a);
+      const bOrder = getProductOrder(b);
+      const aHas = aOrder !== null && aOrder !== undefined;
+      const bHas = bOrder !== null && bOrder !== undefined;
+      if (aHas && bHas) return aOrder - bOrder || getProductIndex(a) - getProductIndex(b);
+      if (aHas) return -1;
+      if (bHas) return 1;
+      return getProductIndex(a) - getProductIndex(b);
+    });
   }
   const orderedGroups = [
     ...categoryList

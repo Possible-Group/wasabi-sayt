@@ -682,7 +682,10 @@ body.ws-body .ws-container{
   background: #fff;
   border: 1px solid var(--site-border);
   box-shadow: var(--site-shadow-soft);
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
   overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
 }
 .site-catalog__link{
   font-weight: 600;

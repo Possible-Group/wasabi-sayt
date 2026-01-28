@@ -6,6 +6,7 @@ import { requireAdmin } from "@/lib/auth/adminAuth";
 const Body = z.object({
   categoryId: z.string().min(1),
   nameUz: z.string().optional(),
+  sortOrder: z.number().int().nullable().optional(),
   seoTitleRu: z.string().optional(),
   seoDescRu: z.string().optional(),
   seoKeywordsRu: z.string().optional(),
@@ -33,6 +34,7 @@ export async function POST(req: Request) {
     create: {
       categoryId: body.categoryId,
       nameUz: body.nameUz || null,
+      sortOrder: body.sortOrder ?? null,
       seoTitleRu: body.seoTitleRu || null,
       seoDescRu: body.seoDescRu || null,
       seoKeywordsRu: body.seoKeywordsRu || null,
@@ -42,6 +44,7 @@ export async function POST(req: Request) {
     },
     update: {
       nameUz: body.nameUz ?? null,
+      sortOrder: body.sortOrder ?? null,
       seoTitleRu: body.seoTitleRu ?? null,
       seoDescRu: body.seoDescRu ?? null,
       seoKeywordsRu: body.seoKeywordsRu ?? null,
