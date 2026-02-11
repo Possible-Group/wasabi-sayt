@@ -104,7 +104,7 @@ export default function AdminSettingsPage() {
       <section className="admin-card stack">
         <div style={{ fontWeight: 600 }}>Сборы</div>
         <label className="admin-field">
-          Упаковка (сум)
+          Пакет (сум)
           <input
             className="admin-input"
             value={v("package_fee", "0")}

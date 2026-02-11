@@ -10,6 +10,8 @@ const LocationSchema = z.object({
   nameUz: z.string().optional().nullable(),
   addressRu: z.string().optional().nullable(),
   addressUz: z.string().optional().nullable(),
+  pickupAddressRu: z.string().optional().nullable(),
+  pickupAddressUz: z.string().optional().nullable(),
   descRu: z.string().optional().nullable(),
   descUz: z.string().optional().nullable(),
   lat: z.number().optional().nullable(),

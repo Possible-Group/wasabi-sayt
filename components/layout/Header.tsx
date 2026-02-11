@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { isWithinWorkHours } from "@/lib/utils/timeWindow";
 
@@ -12,11 +12,13 @@ const COPY = {
     news: "Новости",
     account: "Аккаунт",
     cart: "Корзина",
+    logout: "Выйти",
     search: "Поиск по блюдам...",
     navLabel: "Основная навигация",
     promo: "Присоединяйтесь к нашей бонусной программе — регистрируйтесь и получайте бонусы с каждого заказа",
     sidebar: {
       menu: "Меню",
+      close: "Закрыть меню",
       news: "Новости",
       about: "О нас",
       contacts: "Контакты и адрес",
@@ -33,11 +35,13 @@ const COPY = {
     news: "Yangiliklar",
     account: "Profil",
     cart: "Savat",
+    logout: "Chiqish",
     search: "Taomlar bo'yicha qidiruv...",
     navLabel: "Asosiy navigatsiya",
     promo: "Bonus dasturimizga qo'shiling — ro'yxatdan o'ting va har bir buyurtmadan bonus oling",
     sidebar: {
       menu: "Menyu",
+      close: "Menyuni yopish",
       news: "Yangiliklar",
       about: "Biz haqimizda",
       contacts: "Aloqa va manzil",
@@ -66,6 +70,8 @@ export default function Header({ locale }: { locale: string }) {
   const [langFlags, setLangFlags] = useState({ ru: true, uz: true });
   const [searchValue, setSearchValue] = useState("");
   const [socialLinks, setSocialLinks] = useState({ instagram: "", telegram: "" });
+  const [contactPhone, setContactPhone] = useState("");
+  const [clientLoggedIn, setClientLoggedIn] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -95,8 +101,34 @@ export default function Header({ locale }: { locale: string }) {
           instagram: String(meta?.settings?.social_instagram ?? "").trim(),
           telegram: String(meta?.settings?.social_telegram ?? "").trim(),
         });
+        setContactPhone(String(meta?.settings?.contact_phone ?? "").trim());
       })
       .catch(() => setHoursReady(true));
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    router.prefetch(base);
+  }, [router, base]);
+
+  useEffect(() => {
+    setOpen(false);
+  }, [pathname]);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/auth/client/me")
+      .then((r) => r.json())
+      .then((data) => {
+        if (!active) return;
+        setClientLoggedIn(Boolean(data?.client?.id));
+      })
+      .catch(() => {
+        if (!active) return;
+        setClientLoggedIn(false);
+      });
     return () => {
       active = false;
     };
@@ -135,6 +167,27 @@ export default function Header({ locale }: { locale: string }) {
     setSearchValue(qParam);
   }, [qParam]);
 
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const prevOverflow = document.body.style.overflow;
+    const prevTouchAction = document.body.style.touchAction;
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.body.style.touchAction = prevTouchAction;
+    };
+  }, [open]);
+
   const submitSearch = (value?: string) => {
     const cleaned = (value ?? searchValue).trim();
     const params = new URLSearchParams();
@@ -145,8 +198,39 @@ export default function Header({ locale }: { locale: string }) {
     if (open) setOpen(false);
   };
 
+  const warmupHomeRoute = () => {
+    router.prefetch(base);
+  };
+
+  const goHomeFast = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (
+      event.defaultPrevented ||
+      event.button !== 0 ||
+      event.metaKey ||
+      event.ctrlKey ||
+      event.shiftKey ||
+      event.altKey
+    ) {
+      return;
+    }
+    event.preventDefault();
+    warmupHomeRoute();
+    if (open) setOpen(false);
+
+    if (isHome) {
+      if (qParam) {
+        router.replace(base, { scroll: true });
+      } else {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+      }
+      return;
+    }
+    router.push(base, { scroll: true });
+  };
+
   const searchLabel = locale === "uz" ? "Qidirish" : "Поиск";
   const clearLabel = locale === "uz" ? "Qidiruvni tozalash" : "Очистить поиск";
+  const phoneHref = contactPhone ? `tel:${contactPhone.replace(/[^\d+]/g, "")}` : "";
   const socialItems = [
     {
       id: "instagram",
@@ -197,16 +281,50 @@ export default function Header({ locale }: { locale: string }) {
     </form>
   );
 
+  async function handleLogout() {
+    try {
+      await fetch("/api/auth/client/logout", { method: "POST" });
+    } finally {
+      setClientLoggedIn(false);
+      setOpen(false);
+    }
+  }
+
   return (
     <>
     <header className={`site-header ${scrolled ? "is-scrolled" : ""}`}>
       <div className="ws-container site-header__inner">
-        <Link href={`/${locale}`} className="site-brand" aria-label="Wasabi Sushi">
+        <div className="site-brand-panel">
+        <Link
+          href={`/${locale}`}
+          prefetch
+          className="site-brand"
+          aria-label="Wasabi Sushi"
+          onPointerDown={warmupHomeRoute}
+          onTouchStart={warmupHomeRoute}
+          onClick={goHomeFast}
+        >
           <img className="site-brand__logo" src="/icons/logo.png" alt="Wasabi Sushi" />
         </Link>
+          {contactPhone ? (
+            <>
+              <span className="site-brand-divider" aria-hidden />
+              <a className="site-brand-phone" href={phoneHref} aria-label={contactPhone}>
+                <PhoneIcon />
+                <span>{contactPhone}</span>
+              </a>
+            </>
+          ) : null}
+        </div>
 
         <nav className="site-nav" aria-label={copy.navLabel}>
-          <Link href={`/${locale}`} className={isHome ? "is-active" : ""}>
+          <Link
+            href={`/${locale}`}
+            className={isHome ? "is-active" : ""}
+            onPointerDown={warmupHomeRoute}
+            onTouchStart={warmupHomeRoute}
+            onClick={goHomeFast}
+          >
             <HomeIcon />
             {copy.home}
           </Link>
@@ -261,8 +379,25 @@ export default function Header({ locale }: { locale: string }) {
         <div className="ws-container">{promoText}</div>
       </div>
 
-      <div className={`site-mobile ${open ? "is-open" : ""}`}>
-        <div className="site-mobile__card">
+      <div
+        className={`site-mobile ${open ? "is-open" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-label={copy.sidebar.menu}
+        onClick={() => setOpen(false)}
+      >
+        <div className="site-mobile__card" onClick={(event) => event.stopPropagation()}>
+            <div className="site-mobile__top">
+              <div className="site-mobile__title">{copy.sidebar.menu}</div>
+              <button
+                type="button"
+                className="site-mobile__close"
+                aria-label={copy.sidebar.close}
+                onClick={() => setOpen(false)}
+              >
+                ×
+              </button>
+            </div>
             {renderSearch()}
 
             <div className="site-mobile__links">
@@ -326,6 +461,11 @@ export default function Header({ locale }: { locale: string }) {
               <Link href={`/${locale}/cart`} onClick={() => setOpen(false)}>
                 {copy.cart}
               </Link>
+              {clientLoggedIn ? (
+                <button type="button" onClick={handleLogout}>
+                  {copy.logout}
+                </button>
+              ) : null}
             </div>
 
             {socialItems.length > 0 && (
@@ -397,6 +537,20 @@ function CartIcon() {
       <path d="M4 6h2l2.4 9.5a2 2 0 0 0 2 1.5h7.2a2 2 0 0 0 2-1.6L21 8H7.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
       <circle cx="11" cy="20" r="1.2" fill="currentColor" />
       <circle cx="17" cy="20" r="1.2" fill="currentColor" />
+    </svg>
+  );
+}
+
+function PhoneIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M7.2 3.6c.4-.4 1-.5 1.6-.2l3 1.6c.6.3.8 1 .6 1.6l-1 2.6c-.2.5-.1 1 .2 1.4l3.2 3.2c.4.4.9.5 1.4.2l2.6-1c.6-.2 1.2 0 1.6.6l1.6 3c.3.6.2 1.2-.2 1.6l-1.4 1.4c-.8.8-2 1.1-3.1.8-3.1-.8-6.2-2.6-8.9-5.2S4 8 3.2 4.9c-.3-1.1 0-2.3.8-3.1L7.2 3.6Z"
+        stroke="currentColor"
+        strokeWidth="1.4"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

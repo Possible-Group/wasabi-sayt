@@ -8,6 +8,9 @@ import { getPosterClientById, normalizePosterClient } from "@/lib/poster/posterC
 import { posterFetch } from "@/lib/poster/posterClient";
 import { cached } from "@/lib/poster/posterCache";
 
+const PACKAGE_ITEM_ID = "package_fee";
+const CHOPSTICKS_ITEM_ID = "chopsticks";
+
 const Item = z.object({
   product_id: z.string(),
   name: z.string(),
@@ -132,6 +135,12 @@ function escapeTelegram(text: string) {
   });
 }
 
+function appendExtraComment(base: string, extra: string) {
+  const trimmed = base.trim();
+  if (!extra) return trimmed;
+  return trimmed ? `${trimmed}\n${extra}` : extra;
+}
+
 async function sendTelegramNotification(message: string) {
   const token = process.env.TELEGRAM_BOT_TOKEN;
   const chatId = process.env.TELEGRAM_GROUP_CHAT_ID;
@@ -181,7 +190,6 @@ export async function POST(req: Request) {
     );
   }
 
-  const packageFee = parseIntSetting(map["package_fee"], 0);
   const deliveryFee = parseIntSetting(map["delivery_fee"], 0);
 
   const deliveryType = body.deliveryType;
@@ -229,9 +237,21 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "CLIENT_ID_INVALID" }, { status: 400 });
   }
 
-  const subtotalT = body.items.reduce((s, it) => s + it.price * it.qty, 0);
+  const packageItems = body.items.filter((it) => it.product_id === PACKAGE_ITEM_ID);
+  const chopsticksItems = body.items.filter((it) => it.product_id === CHOPSTICKS_ITEM_ID);
+  const regularItems = body.items.filter(
+    (it) => it.product_id !== PACKAGE_ITEM_ID && it.product_id !== CHOPSTICKS_ITEM_ID
+  );
+  if (!regularItems.length) {
+    return NextResponse.json({ error: "EMPTY_CART" }, { status: 400 });
+  }
+  const packageQty = packageItems.reduce((sum, it) => sum + it.qty, 0);
+  const packageFee = packageQty > 0 ? parseIntSetting(map["package_fee"], 0) * packageQty : 0;
+  const chopsticksIncluded = chopsticksItems.length > 0;
+
+  const subtotalT = regularItems.reduce((s, it) => s + it.price * it.qty, 0);
   const promoDiscountT = promo
-    ? body.items.reduce((s, it) => {
+    ? regularItems.reduce((s, it) => {
         const discounted = applyDiscount(it.price, {
           ...promo,
           discountValue: promo.resultType === 1 ? promo.discountValue * 100 : promo.discountValue,
@@ -255,7 +275,7 @@ export async function POST(req: Request) {
   const serviceMode = deliveryType === "delivery" ? 3 : 2;
   const spotId = digitsOnly(spotIdRaw);
 
-  const productsPayload = body.items.map((it) => {
+  const productsPayload = regularItems.map((it) => {
     const idRaw = digitsOnly(it.product_id);
     const idNum = idRaw ? Number(idRaw) : Number(it.product_id);
     const priceSum = it.price / 100;
@@ -274,6 +294,11 @@ export async function POST(req: Request) {
     };
   });
 
+  const commentText = appendExtraComment(
+    String(body.comment ?? ""),
+    chopsticksIncluded ? "" : "Без палочек"
+  );
+
   const orderPayload = {
     service_mode: serviceMode,
     spot_id: spotId ? Number(spotId) : 0,
@@ -290,7 +315,7 @@ export async function POST(req: Request) {
     status: "bot",
     client_id: Number(clientIdRaw),
     pers_num: body.persons ?? 1,
-    comment: body.comment ?? "",
+    comment: commentText,
     address: deliveryType === "delivery" ? address : "",
     promocode: promoCodeInput || "",
     promocode_id: promo?.promotionId ?? 0,
@@ -333,7 +358,7 @@ export async function POST(req: Request) {
       lat: deliveryType === "delivery" ? lat ?? null : null,
       lng: deliveryType === "delivery" ? lng ?? null : null,
       persons: body.persons ?? 1,
-      itemsJson: JSON.stringify(body.items),
+      itemsJson: JSON.stringify(regularItems),
       subtotal: subtotalT,
       packageFee: Math.round(packageFee * 100),
       deliveryFee: Math.round(deliveryFee * 100),
@@ -356,7 +381,7 @@ export async function POST(req: Request) {
       : "Филиал: —";
   const promoLine = promoCodeInput ? `Промокод: ${promoCodeInput}` : "Промокод: —";
   const bonusLine = bonusCapped > 0 ? `Бонусы: ${formatMoney(bonusCapped)}` : "Бонусы: —";
-  const commentLine = body.comment ? `Комментарий: ${escapeTelegram(body.comment)}` : "Комментарий: —";
+  const commentLine = commentText ? `Комментарий: ${escapeTelegram(commentText)}` : "Комментарий: —";
 
   const telegramMessage = [
     `🍣 ${header}`,

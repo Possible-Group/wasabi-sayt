@@ -8,7 +8,6 @@ import type { Locale } from "@/lib/i18n/config";
 import { isLocale } from "@/lib/i18n/config";
 
 type ClientProfile = {
-  id: string;
   name: string;
   phone: string;
   bonus: number;
@@ -83,6 +82,12 @@ function formatNumber(value: number, locale: Locale) {
   }
 }
 
+function sanitizeProfileName(value: string) {
+  const normalized = String(value || "").replace(/\r?\n+/g, " ").trim();
+  if (!normalized) return "";
+  return normalized.replace(/^id\s*[:#-]?\s*\d+\s*/i, "").trim();
+}
+
 export default function AccountPage() {
   const routeParams = useParams();
   const rawLocale = Array.isArray(routeParams?.locale)
@@ -130,6 +135,7 @@ export default function AccountPage() {
   }, []);
 
   const bonusLabel = useMemo(() => formatNumber(client?.bonus || 0, locale), [client?.bonus, locale]);
+  const profileName = useMemo(() => sanitizeProfileName(client?.name || ""), [client?.name]);
 
   async function handleLogin() {
     if (!loginPhone.trim() || !loginPassword.trim()) return;
@@ -239,8 +245,7 @@ export default function AccountPage() {
             ) : client ? (
               <div className="account-grid">
                 <div className="site-card account-card account-profile">
-                  <div className="account-pill">ID: {client.id}</div>
-                  <div className="account-name">{client.name || (locale === "uz" ? "Mehmon" : "Гость")}</div>
+                  <div className="account-name">{profileName || (locale === "uz" ? "Mehmon" : "Гость")}</div>
                   <div className="account-phone">{client.phone}</div>
                   <div className="account-bonus">
                     <span>{copy.bonusLabel}</span>

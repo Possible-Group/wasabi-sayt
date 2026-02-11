@@ -6,6 +6,7 @@ import { prisma } from "@/lib/db/prisma";
 import { requireAdmin } from "@/lib/auth/adminAuth";
 
 export const dynamic = "force-dynamic";
+const PRODUCTS_TTL = 60_000;
 
 function hasOffMarker(value: any): boolean {
   if (typeof value !== "string") return false;
@@ -37,6 +38,11 @@ async function getOffCategoryIds(): Promise<Set<string>> {
   return offIds;
 }
 
+async function fetchProducts(category_id?: string | null) {
+  const key = `poster:products:${category_id || "all"}`;
+  return cached(key, PRODUCTS_TTL, () => posterFetch<any>("menu.getProducts", { category_id }));
+}
+
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const category_id = searchParams.get("category_id") || undefined;
@@ -47,11 +53,13 @@ export async function GET(req: Request) {
     if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const raw = await posterFetch<any>("menu.getProducts", { category_id });
+  const raw = await fetchProducts(category_id);
   let mapped = mapPosterProducts(raw, { includeOff: includeHidden });
 
   if (!category_id && mapped.length === 0) {
-    const catsRaw = await posterFetch<any>("menu.getCategories");
+    const catsRaw = await cached("poster:categories", PRODUCTS_TTL, () =>
+      posterFetch<any>("menu.getCategories")
+    );
     const cats =
       (Array.isArray(catsRaw?.response) && catsRaw.response) ||
       (Array.isArray(catsRaw?.categories) && catsRaw.categories) ||
@@ -61,7 +69,7 @@ export async function GET(req: Request) {
       .filter(Boolean);
     const perCat = await Promise.all(
       ids.map((id: string) =>
-        posterFetch<any>("menu.getProducts", { category_id: id }).catch(() => null)
+        fetchProducts(id).catch(() => null)
       )
     );
     mapped = perCat.flatMap((res, idx) => {

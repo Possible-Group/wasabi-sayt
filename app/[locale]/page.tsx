@@ -141,9 +141,9 @@ function svgDataUrl(label: string) {
   <svg xmlns='http://www.w3.org/2000/svg' width='1200' height='800'>
     <defs>
       <linearGradient id='g' x1='0' x2='1' y1='0' y2='1'>
-        <stop offset='0' stop-color='#2f6b3c'/>
-        <stop offset='0.55' stop-color='#d08a4b'/>
-        <stop offset='1' stop-color='#f6d1a6'/>
+        <stop offset='0' stop-color='#678F07'/>
+        <stop offset='0.55' stop-color='#F98F01'/>
+        <stop offset='1' stop-color='#FFFADD'/>
       </linearGradient>
       <radialGradient id='r' cx='35%' cy='30%' r='70%'>
         <stop offset='0' stop-color='rgba(255,255,255,0.28)'/>
@@ -174,9 +174,9 @@ function bannerDataUrl() {
   <svg xmlns='http://www.w3.org/2000/svg' width='1600' height='900'>
     <defs>
       <linearGradient id='g' x1='0' x2='1' y1='0' y2='1'>
-        <stop offset='0' stop-color='#2f6b3c'/>
-        <stop offset='0.6' stop-color='#d08a4b'/>
-        <stop offset='1' stop-color='#f2cfac'/>
+        <stop offset='0' stop-color='#678F07'/>
+        <stop offset='0.6' stop-color='#F98F01'/>
+        <stop offset='1' stop-color='#FFFADD'/>
       </linearGradient>
       <radialGradient id='r1' cx='30%' cy='30%' r='60%'>
         <stop offset='0' stop-color='rgba(255,255,255,0.35)'/>
@@ -451,7 +451,7 @@ export default async function HomePage({
 
   const topProductsPromise: Promise<ProductCard[]> = (async () => {
     try {
-      const res = await fetch(`${origin}/api/poster/products`, { cache: "no-store" });
+      const res = await fetch(`${origin}/api/poster/products`, { next: { revalidate: 60 } });
       if (!res.ok) throw new Error("products");
       const rows = await res.json();
       if (!Array.isArray(rows) || rows.length === 0) throw new Error("empty");
@@ -498,7 +498,7 @@ export default async function HomePage({
 
   const categoryListPromise: Promise<{ id: string; title: string }[]> = (async () => {
     try {
-      const res = await fetch(`${origin}/api/poster/categories`, { cache: "no-store" });
+      const res = await fetch(`${origin}/api/poster/categories`, { next: { revalidate: 60 } });
       if (!res.ok) throw new Error("categories");
       const json = await res.json();
       const arr =

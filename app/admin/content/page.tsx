@@ -38,6 +38,8 @@ type AboutLocation = {
   nameUz?: string | null;
   addressRu?: string | null;
   addressUz?: string | null;
+  pickupAddressRu?: string | null;
+  pickupAddressUz?: string | null;
   descRu?: string | null;
   descUz?: string | null;
   lat?: number | null;
@@ -259,6 +261,8 @@ export default function AdminContentPage() {
         nameUz: "",
         addressRu: spot.address ?? "",
         addressUz: "",
+        pickupAddressRu: "",
+        pickupAddressUz: "",
         descRu: "",
         descUz: "",
         lat: spot.lat ?? null,
@@ -760,7 +764,7 @@ export default function AdminContentPage() {
           <div className="admin-pill">Выбрано: {locations.length}</div>
         </div>
         <p className="admin-subtitle">
-          Выберите локации из Poster, задайте название и описание на RU/UZ, координаты и адрес.
+          Выберите локации из Poster, задайте название, адрес и описание на RU/UZ, координаты и адрес самовывоза.
         </p>
 
         <div className="admin-grid">
@@ -821,6 +825,16 @@ export default function AdminContentPage() {
                           />
                         </label>
                         <label className="admin-field">
+                          Адрес самовывоза (RU)
+                          <input
+                            className="admin-input"
+                            value={loc.pickupAddressRu || ""}
+                            onChange={(e) =>
+                              updateLocation(loc.id, { pickupAddressRu: e.target.value })
+                            }
+                          />
+                        </label>
+                        <label className="admin-field">
                           Описание (RU)
                           <textarea
                             className="admin-textarea"
@@ -846,6 +860,16 @@ export default function AdminContentPage() {
                             className="admin-input"
                             value={loc.addressUz || ""}
                             onChange={(e) => updateLocation(loc.id, { addressUz: e.target.value })}
+                          />
+                        </label>
+                        <label className="admin-field">
+                          Адрес самовывоза (UZ)
+                          <input
+                            className="admin-input"
+                            value={loc.pickupAddressUz || ""}
+                            onChange={(e) =>
+                              updateLocation(loc.id, { pickupAddressUz: e.target.value })
+                            }
                           />
                         </label>
                         <label className="admin-field">

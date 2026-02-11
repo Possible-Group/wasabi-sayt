@@ -4,7 +4,23 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Locale } from "@/lib/i18n/config";
 import { isLocale } from "@/lib/i18n/config";
 import { t } from "@/lib/i18n/t";
-import { getCart, cartSubtotal, clearCart, type CartItem } from "@/lib/cart/cart";
+import {
+  getCart,
+  setCart,
+  clearCart,
+  type CartItem,
+  PACKAGE_ITEM_ID,
+  CHOPSTICKS_ITEM_ID,
+  isPackageItem,
+  isChopsticksItem,
+  isExtraItem,
+  getItemsSubtotal,
+  getPackageTotal,
+  getPackageOptOut,
+  clearPackageOptOut,
+  getChopsticksOptOut,
+  clearChopsticksOptOut,
+} from "@/lib/cart/cart";
 import { useParams, useRouter } from "next/navigation";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
@@ -30,6 +46,8 @@ type AboutLocation = {
   nameUz?: string | null;
   addressRu?: string | null;
   addressUz?: string | null;
+  pickupAddressRu?: string | null;
+  pickupAddressUz?: string | null;
   descRu?: string | null;
   descUz?: string | null;
   lat?: number | null;
@@ -58,6 +76,10 @@ const COPY = {
     mapHint: "Кликните по карте, чтобы выбрать точку доставки.",
     mapLoading: "Загружаем карту...",
     mapError: "Не удалось загрузить карту. Попробуйте позже.",
+    myLocation: "Мое местоположение",
+    myLocationLoading: "Определяем...",
+    myLocationError: "Не удалось определить местоположение.",
+    myLocationDenied: "Разрешите доступ к геолокации.",
     pickupTitle: "Филиалы для самовывоза",
     pickupEmpty: "Филиалы не найдены.",
     paymentTitle: "Оплата",
@@ -70,9 +92,23 @@ const COPY = {
     promoHint: "Промокод проверим при подтверждении.",
     subtotalLabel: "Сумма заказа",
     deliveryFeeLabel: "Доставка",
-    packageFeeLabel: "Упаковка",
+    packageFeeLabel: "Пакет",
     bonusUsedLabel: "Списано бонусами",
     totalLabel: "К оплате",
+    deliveryTimeTitle: "Время доставки",
+    deliveryTimeEdit: "Изменить",
+    deliveryTimeToday: "Сегодня",
+    deliveryTimeOther: "Другой день",
+    deliveryTimeTodayOption: "Сегодня: через",
+    deliveryTimeMinutes: "мин",
+    deliveryTimeChooseDate: "Выберите дату",
+    deliveryTimeChooseTime: "Выберите время",
+    deliveryTimeApply: "Сохранить",
+    deliveryTimeNote: "Время доставки:",
+    deliveryTimeClose: "Закрыть выбор времени",
+    confirmTitle: "Вы уверены, что хотите оформить заказ?",
+    confirmYes: "Да",
+    confirmNo: "Нет",
     errAuth: "Авторизуйтесь, чтобы оформить заказ.",
     errLocation: "Укажите точку на карте.",
     errSpot: "Выберите филиал.",
@@ -99,6 +135,10 @@ const COPY = {
     mapHint: "Xaritada yetkazish nuqtasini tanlang.",
     mapLoading: "Xarita yuklanmoqda...",
     mapError: "Xaritani yuklab bo'lmadi. Keyinroq urinib ko'ring.",
+    myLocation: "Mening joylashuvim",
+    myLocationLoading: "Aniqlanmoqda...",
+    myLocationError: "Joylashuvni aniqlab bo'lmadi.",
+    myLocationDenied: "Geolokatsiyaga ruxsat bering.",
     pickupTitle: "Olib ketish filiallari",
     pickupEmpty: "Filiallar topilmadi.",
     paymentTitle: "To'lov",
@@ -111,9 +151,23 @@ const COPY = {
     promoHint: "Promokodni tasdiqlashda tekshiramiz.",
     subtotalLabel: "Buyurtma summasi",
     deliveryFeeLabel: "Yetkazish",
-    packageFeeLabel: "Qadoq",
+    packageFeeLabel: "Paket",
     bonusUsedLabel: "Bonusdan yechildi",
     totalLabel: "To'lash",
+    deliveryTimeTitle: "Yetkazish vaqti",
+    deliveryTimeEdit: "O'zgartirish",
+    deliveryTimeToday: "Bugun",
+    deliveryTimeOther: "Boshqa kun",
+    deliveryTimeTodayOption: "Bugun: taxminan",
+    deliveryTimeMinutes: "min",
+    deliveryTimeChooseDate: "Sana tanlang",
+    deliveryTimeChooseTime: "Vaqt tanlang",
+    deliveryTimeApply: "Saqlash",
+    deliveryTimeNote: "Yetkazish vaqti:",
+    deliveryTimeClose: "Vaqt tanlashni yopish",
+    confirmTitle: "Buyurtmani rasmiylashtirishni tasdiqlaysizmi?",
+    confirmYes: "Ha",
+    confirmNo: "Yo'q",
     errAuth: "Buyurtma uchun kirish kerak.",
     errLocation: "Xaritadan manzilni tanlang.",
     errSpot: "Filialni tanlang.",
@@ -132,6 +186,7 @@ const YANDEX_SCRIPT_ID = "yandex-maps-script";
 const YANDEX_API_KEY = process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY;
 const MAP_CONTAINER_ID = "checkout-map-canvas";
 const LOCATIONS_KEY = "wasabi_saved_locations_v1";
+const DEFAULT_DELIVERY_MINUTES = 70;
 
 function formatMoney(value: number, locale: Locale) {
   try {
@@ -139,6 +194,45 @@ function formatMoney(value: number, locale: Locale) {
   } catch {
     return String(value);
   }
+}
+
+function addMinutes(date: Date, minutes: number) {
+  return new Date(date.getTime() + minutes * 60_000);
+}
+
+function formatTimeLabel(date: Date, locale: Locale) {
+  try {
+    return new Intl.DateTimeFormat(locale === "uz" ? "uz-UZ" : "ru-RU", {
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
+  } catch {
+    return date.toLocaleTimeString();
+  }
+}
+
+function formatDateLabel(value: string, locale: Locale) {
+  if (!value) return "";
+  const parsed = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return value;
+  try {
+    return new Intl.DateTimeFormat(locale === "uz" ? "uz-UZ" : "ru-RU", {
+      day: "2-digit",
+      month: "long",
+    }).format(parsed);
+  } catch {
+    return value;
+  }
+}
+
+function toInputDate(value: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${value.getFullYear()}-${pad(value.getMonth() + 1)}-${pad(value.getDate())}`;
+}
+
+function toInputTime(value: Date) {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(value.getHours())}:${pad(value.getMinutes())}`;
 }
 
 function formatCoords(lat: number, lng: number) {
@@ -255,6 +349,15 @@ function loadYandexMaps(lang: string) {
   });
 }
 
+function ClockIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M12 7v5l3 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export default function CheckoutPage() {
   const routeParams = useParams();
   const rawLocale = Array.isArray(routeParams?.locale)
@@ -293,12 +396,20 @@ export default function CheckoutPage() {
   const mapInstance = useRef<any>(null);
   const markerRef = useRef<any>(null);
   const addressRequestId = useRef(0);
+  const [geoLoading, setGeoLoading] = useState(false);
+  const [geoError, setGeoError] = useState("");
 
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [savingLocation, setSavingLocation] = useState(false);
   const [successOrderId, setSuccessOrderId] = useState<string | null>(null);
   const [successOpen, setSuccessOpen] = useState(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [deliveryTimeOpen, setDeliveryTimeOpen] = useState(false);
+  const [deliveryTimeTab, setDeliveryTimeTab] = useState<"today" | "other">("today");
+  const [deliveryTimeMode, setDeliveryTimeMode] = useState<"today" | "other">("today");
+  const [deliveryDate, setDeliveryDate] = useState("");
+  const [deliveryClock, setDeliveryClock] = useState("");
 
   useEffect(() => setItems(getCart()), []);
   useEffect(() => setSavedLocations(loadSavedLocations()), []);
@@ -398,6 +509,8 @@ export default function CheckoutPage() {
               nameUz: s.name ?? "",
               addressRu: s.address ?? "",
               addressUz: s.address ?? "",
+              pickupAddressRu: s.address ?? "",
+              pickupAddressUz: s.address ?? "",
               lat: typeof s.lat === "number" ? s.lat : s.lat ? Number(s.lat) : null,
               lng: typeof s.lng === "number" ? s.lng : s.lng ? Number(s.lng) : null,
             }));
@@ -433,6 +546,55 @@ export default function CheckoutPage() {
       setMapStatus("idle");
     }
   }, [showMap]);
+
+  function createPlacemark(ymaps: any, lat: number, lng: number, center = false) {
+    const pos: [number, number] = [lat, lng];
+    const placemark = new ymaps.Placemark(pos, {}, { draggable: true });
+    placemark.events.add("dragend", (e: any) => {
+      const next = e.get("target").geometry.getCoordinates() as [number, number];
+      applyCoords(Number(next[0]), Number(next[1]), ymaps, { center: false });
+    });
+    if (center && mapInstance.current?.setCenter) {
+      mapInstance.current.setCenter(pos);
+    }
+    return placemark;
+  }
+
+  function applyCoords(
+    nextLat: number,
+    nextLng: number,
+    ymaps?: any,
+    opts?: { center?: boolean }
+  ) {
+    const shouldCenter = opts?.center !== false;
+    setSelectedLocationId(null);
+    setCoords({ lat: nextLat, lng: nextLng });
+
+    if (ymaps && mapInstance.current) {
+      const pos: [number, number] = [nextLat, nextLng];
+      if (shouldCenter && mapInstance.current.setCenter) {
+        mapInstance.current.setCenter(pos);
+      }
+      if (markerRef.current) {
+        markerRef.current.geometry.setCoordinates(pos);
+      } else {
+        const placemark = createPlacemark(ymaps, nextLat, nextLng);
+        markerRef.current = placemark;
+        mapInstance.current.geoObjects.add(placemark);
+      }
+    }
+
+    const reqId = ++addressRequestId.current;
+    const resolver = ymaps
+      ? resolveAddressByCoords(ymaps, nextLat, nextLng)
+      : fetchAddressFromApi(nextLat, nextLng);
+    resolver
+      .then((resolved) => {
+        if (reqId !== addressRequestId.current) return;
+        if (resolved) setAddress(resolved);
+      })
+      .catch(() => undefined);
+  }
 
   useEffect(() => {
     if (deliveryType !== "delivery") return;
@@ -475,18 +637,7 @@ export default function CheckoutPage() {
           window.setTimeout(() => map.container.fitToViewport(), 200);
 
           if (coords) {
-            const placemark = new ymaps.Placemark([coords.lat, coords.lng], {}, { draggable: true });
-            placemark.events.add("dragend", (e: any) => {
-              const pos = e.get("target").geometry.getCoordinates();
-              const nextLat = Number(pos[0]);
-              const nextLng = Number(pos[1]);
-              setCoords({ lat: nextLat, lng: nextLng });
-              const reqId = ++addressRequestId.current;
-              resolveAddressByCoords(ymaps, nextLat, nextLng).then((resolved) => {
-                if (cancelled || reqId !== addressRequestId.current) return;
-                if (resolved) setAddress(resolved);
-              });
-            });
+            const placemark = createPlacemark(ymaps, coords.lat, coords.lng);
             markerRef.current = placemark;
             map.geoObjects.add(placemark);
           }
@@ -495,23 +646,8 @@ export default function CheckoutPage() {
             const pos = e.get("coords") as [number, number];
             const nextLat = Number(pos[0]);
             const nextLng = Number(pos[1]);
-            setSelectedLocationId(null);
-            setCoords({ lat: nextLat, lng: nextLng });
-            map.setCenter(pos);
-
-            if (markerRef.current) {
-              markerRef.current.geometry.setCoordinates(pos);
-            } else {
-              const placemark = new ymaps.Placemark(pos, {}, { draggable: true });
-              markerRef.current = placemark;
-              map.geoObjects.add(placemark);
-            }
-
-            const reqId = ++addressRequestId.current;
-            resolveAddressByCoords(ymaps, nextLat, nextLng).then((resolved) => {
-              if (cancelled || reqId !== addressRequestId.current) return;
-              if (resolved) setAddress(resolved);
-            });
+            if (cancelled) return;
+            applyCoords(nextLat, nextLng, ymaps, { center: true });
           });
 
           window.clearTimeout(fallbackTimer);
@@ -578,6 +714,34 @@ export default function CheckoutPage() {
     }
 
     return "";
+  }
+
+  function useMyLocation() {
+    if (typeof window === "undefined") return;
+    if (!navigator.geolocation) {
+      setGeoError(copy.myLocationError);
+      return;
+    }
+    setGeoError("");
+    setGeoLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        const nextLat = Number(pos.coords.latitude);
+        const nextLng = Number(pos.coords.longitude);
+        const ymaps = window.ymaps;
+        applyCoords(nextLat, nextLng, ymaps, { center: true });
+        setGeoLoading(false);
+      },
+      (err) => {
+        if (err?.code === 1) {
+          setGeoError(copy.myLocationDenied);
+        } else {
+          setGeoError(copy.myLocationError);
+        }
+        setGeoLoading(false);
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+    );
   }
 
   function selectSavedLocation(location: SavedLocation) {
@@ -671,9 +835,19 @@ export default function CheckoutPage() {
     }
   }
 
-  const subtotal = cartSubtotal(items);
-  const subtotalSum = subtotal / 100;
-  const feesSum = fees.pack + (deliveryType === "delivery" ? fees.delivery : 0);
+
+  const packageLabel = locale === "uz" ? "Paket" : "Пакет";
+  const chopsticksLabel = locale === "uz" ? "Tayoqchalar" : "Палочки";
+  const packagePriceT = Math.round(fees.pack * 100);
+  const chopsticksPriceT = 0;
+  const packageItem = items.find(isPackageItem) || null;
+  const productItems = items.filter((it) => !isExtraItem(it));
+  const hasProducts = productItems.length > 0;
+  const itemsSubtotalT = getItemsSubtotal(items);
+  const packageTotalT = getPackageTotal(items);
+  const subtotalSum = itemsSubtotalT / 100;
+  const packageSum = packageTotalT / 100;
+  const feesSum = packageSum + (deliveryType === "delivery" ? fees.delivery : 0);
   const totalBeforeBonus = Math.max(0, subtotalSum + feesSum);
   const bonusAvailable = Number(client?.bonus ?? 0) || 0;
   const bonusCandidate = useMemo(() => {
@@ -683,6 +857,115 @@ export default function CheckoutPage() {
   }, [bonusInput]);
   const bonusUsed = Math.min(Math.max(bonusCandidate, 0), bonusAvailable, totalBeforeBonus);
   const totalSum = Math.max(0, totalBeforeBonus - bonusUsed);
+  const todayEta = useMemo(
+    () => addMinutes(new Date(), DEFAULT_DELIVERY_MINUTES),
+    [deliveryTimeOpen]
+  );
+  const todayLabel = `${copy.deliveryTimeToday} ~ ${formatTimeLabel(todayEta, locale)} (${DEFAULT_DELIVERY_MINUTES} ${copy.deliveryTimeMinutes})`;
+  const hasCustomDeliveryTime = Boolean(deliveryDate && deliveryClock);
+  const otherLabel = `${copy.deliveryTimeOther}: ${formatDateLabel(deliveryDate, locale)} ${deliveryClock}`.trim();
+  const deliveryTimeLabel =
+    deliveryTimeMode === "other" && hasCustomDeliveryTime ? otherLabel : todayLabel;
+  const minOtherDeliveryDate = useMemo(
+    () => toInputDate(addMinutes(new Date(), 24 * 60)),
+    [deliveryTimeOpen]
+  );
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    let next = items.slice();
+    let changed = false;
+
+    const hasRealProducts = next.some((it) => !isExtraItem(it));
+    const allowPackage = hasRealProducts && fees.pack > 0;
+    const allowChopsticks = hasRealProducts;
+
+    if (!allowPackage && next.some(isPackageItem)) {
+      next = next.filter((it) => !isPackageItem(it));
+      clearPackageOptOut();
+      changed = true;
+    }
+
+    if (!allowChopsticks && next.some(isChopsticksItem)) {
+      next = next.filter((it) => !isChopsticksItem(it));
+      clearChopsticksOptOut();
+      changed = true;
+    }
+
+    if (allowPackage) {
+      if (next.some(isPackageItem)) {
+        const updated = next.map((it) =>
+          isPackageItem(it)
+            ? it.price === packagePriceT && it.name === packageLabel && it.qty === 1
+              ? it
+              : { ...it, price: packagePriceT, name: packageLabel, qty: 1 }
+            : it
+        );
+        if (updated.some((it, idx) => it !== next[idx])) {
+          next = updated;
+          changed = true;
+        }
+      } else if (!getPackageOptOut()) {
+        next = [...next, { product_id: PACKAGE_ITEM_ID, name: packageLabel, price: packagePriceT, qty: 1 }];
+        changed = true;
+      }
+    }
+
+    if (allowChopsticks) {
+      if (next.some(isChopsticksItem)) {
+        const updated = next.map((it) =>
+          isChopsticksItem(it)
+            ? it.price === chopsticksPriceT && it.name === chopsticksLabel && it.qty === 1
+              ? it
+              : { ...it, price: chopsticksPriceT, name: chopsticksLabel, qty: 1 }
+            : it
+        );
+        if (updated.some((it, idx) => it !== next[idx])) {
+          next = updated;
+          changed = true;
+        }
+      } else if (!getChopsticksOptOut()) {
+        next = [...next, { product_id: CHOPSTICKS_ITEM_ID, name: chopsticksLabel, price: chopsticksPriceT, qty: 1 }];
+        changed = true;
+      }
+    }
+
+    if (changed) {
+      setItems(next);
+      setCart(next);
+    }
+  }, [fees.pack, items, locale, packageLabel, packagePriceT, chopsticksLabel, chopsticksPriceT]);
+
+  useEffect(() => {
+    if (!deliveryTimeOpen) return;
+    if (!deliveryDate) {
+      setDeliveryDate(toInputDate(addMinutes(new Date(), 24 * 60)));
+    }
+    if (!deliveryClock) {
+      setDeliveryClock(toInputTime(todayEta));
+    }
+  }, [deliveryTimeOpen, deliveryDate, deliveryClock, todayEta]);
+  useEffect(() => {
+    if (!deliveryTimeOpen) return;
+    if (!deliveryDate) return;
+    if (deliveryDate < minOtherDeliveryDate) {
+      setDeliveryDate(minOtherDeliveryDate);
+    }
+  }, [deliveryDate, deliveryTimeOpen, minOtherDeliveryDate]);
+
+  function buildOrderComment() {
+    const base = comment.trim();
+    if (deliveryType !== "delivery") return base || undefined;
+    const note =
+      deliveryTimeMode === "other"
+        ? hasCustomDeliveryTime
+          ? `${copy.deliveryTimeNote} ${deliveryTimeLabel}`
+          : ""
+        : `${copy.deliveryTimeNote} ${deliveryTimeLabel}`;
+    if (!note) return base || undefined;
+    if (!base) return note;
+    return `${base}\n${note}`;
+  }
 
   async function placeOrder() {
     setErr(null);
@@ -691,7 +974,7 @@ export default function CheckoutPage() {
       setErr(copy.errAuth);
       return;
     }
-    if (items.length === 0) {
+    if (!hasProducts) {
       return setErr(locale === "uz" ? "Savat bo'sh" : "Корзина пустая");
     }
     if (!phone.trim()) {
@@ -725,7 +1008,7 @@ export default function CheckoutPage() {
           paymentMethod,
           bonusAmount: bonusUsed || 0,
           promoCode: promoCode.trim() || undefined,
-          comment: comment.trim() || undefined,
+          comment: buildOrderComment(),
           items: items.map((i) => ({
             product_id: i.product_id,
             name: i.name,
@@ -743,6 +1026,9 @@ export default function CheckoutPage() {
           );
         }
         if (data?.error === "UNAUTHORIZED") return setErr(copy.errAuth);
+        if (data?.error === "EMPTY_CART") {
+          return setErr(locale === "uz" ? "Savat bo'sh" : "Корзина пустая");
+        }
         if (data?.error === "PHONE_REQUIRED") {
           return setErr(locale === "uz" ? "Telefon kiriting" : "Введите телефон");
         }
@@ -882,7 +1168,18 @@ export default function CheckoutPage() {
 
                   {showMap ? (
                     <div className="checkout-map-block">
-                      <div style={{ fontWeight: 600 }}>{copy.mapTitle}</div>
+                      <div className="checkout-map-head">
+                        <div style={{ fontWeight: 600 }}>{copy.mapTitle}</div>
+                        <button
+                          type="button"
+                          className="site-button site-button--ghost checkout-map-action"
+                          onClick={useMyLocation}
+                          disabled={geoLoading}
+                        >
+                          {geoLoading ? copy.myLocationLoading : copy.myLocation}
+                        </button>
+                      </div>
+                      {geoError ? <div className="site-subtitle">{geoError}</div> : null}
                       {mapStatus === "error" ? (
                         <div className="checkout-map checkout-map__fallback">{copy.mapError}</div>
                       ) : (
@@ -944,10 +1241,15 @@ export default function CheckoutPage() {
                           locale === "uz"
                             ? loc.nameUz || loc.nameRu || "Filial"
                             : loc.nameRu || loc.nameUz || "Филиал";
-                        const addressText =
+                        const pickupAddress =
                           locale === "uz"
+                            ? loc.pickupAddressUz || loc.pickupAddressRu
+                            : loc.pickupAddressRu || loc.pickupAddressUz;
+                        const addressText =
+                          pickupAddress ||
+                          (locale === "uz"
                             ? loc.addressUz || loc.addressRu
-                            : loc.addressRu || loc.addressUz;
+                            : loc.addressRu || loc.addressUz);
                         return (
                           <button
                             type="button"
@@ -1070,6 +1372,28 @@ export default function CheckoutPage() {
                 </label>
               </div>
 
+              {deliveryType === "delivery" ? (
+                <div className="checkout-time">
+                  <div className="checkout-time__head">
+                    <div style={{ fontWeight: 600 }}>{copy.deliveryTimeTitle}</div>
+                    <button
+                      type="button"
+                      className="site-button site-button--ghost checkout-time__edit"
+                      onClick={() => {
+                        setDeliveryTimeTab(deliveryTimeMode);
+                        setDeliveryTimeOpen(true);
+                      }}
+                    >
+                      {copy.deliveryTimeEdit}
+                    </button>
+                  </div>
+                  <div className="checkout-time__row">
+                    <ClockIcon />
+                    <span>{deliveryTimeLabel}</span>
+                  </div>
+                </div>
+              ) : null}
+
               <div className="site-divider" />
 
               <div className="checkout-summary">
@@ -1085,12 +1409,14 @@ export default function CheckoutPage() {
                     {formatMoney(deliveryType === "delivery" ? fees.delivery : 0, locale)} {locale === "uz" ? "so'm" : "сум"}
                   </span>
                 </div>
-                <div className="checkout-summary__row">
-                  <span>{copy.packageFeeLabel}</span>
-                  <span>
-                    {formatMoney(fees.pack, locale)} {locale === "uz" ? "so'm" : "сум"}
-                  </span>
-                </div>
+                {packageItem ? (
+                  <div className="checkout-summary__row">
+                    <span>{copy.packageFeeLabel}</span>
+                    <span>
+                      {formatMoney(packageSum, locale)} {locale === "uz" ? "so'm" : "сум"}
+                    </span>
+                  </div>
+                ) : null}
                 <div className="checkout-summary__row">
                   <span>{copy.bonusUsedLabel}</span>
                   <span>
@@ -1110,7 +1436,7 @@ export default function CheckoutPage() {
               <button
                 className="site-button site-button--primary"
                 disabled={loading}
-                onClick={placeOrder}
+                onClick={() => setConfirmOpen(true)}
               >
                 {loading ? "..." : t(locale, "common.placeOrder")}
               </button>
@@ -1120,6 +1446,124 @@ export default function CheckoutPage() {
       </main>
 
       <Footer locale={locale} />
+
+      {deliveryTimeOpen ? (
+        <div
+          className="delivery-time-popup"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setDeliveryTimeOpen(false)}
+        >
+          <div className="delivery-time-card" onClick={(e) => e.stopPropagation()}>
+            <button
+              type="button"
+              className="delivery-time-close"
+              aria-label={copy.deliveryTimeClose}
+              onClick={() => setDeliveryTimeOpen(false)}
+            >
+              ×
+            </button>
+            <div className="delivery-time-title">{copy.deliveryTimeTitle}</div>
+            <div className="delivery-time-tabs">
+              <button
+                type="button"
+                className={deliveryTimeTab === "today" ? "is-active" : ""}
+                onClick={() => setDeliveryTimeTab("today")}
+              >
+                {copy.deliveryTimeToday}
+              </button>
+              <button
+                type="button"
+                className={deliveryTimeTab === "other" ? "is-active" : ""}
+                onClick={() => setDeliveryTimeTab("other")}
+              >
+                {copy.deliveryTimeOther}
+              </button>
+            </div>
+
+            {deliveryTimeTab === "today" ? (
+              <button
+                type="button"
+                className="delivery-time-option is-active"
+                onClick={() => {
+                  setDeliveryTimeMode("today");
+                  setDeliveryTimeOpen(false);
+                }}
+              >
+                <div>
+                  <div style={{ fontWeight: 700 }}>{copy.deliveryTimeToday}</div>
+                  <div className="site-subtitle">
+                    {copy.deliveryTimeTodayOption} {DEFAULT_DELIVERY_MINUTES} {copy.deliveryTimeMinutes}
+                  </div>
+                </div>
+                <span className="delivery-time-check">✓</span>
+              </button>
+            ) : (
+              <div className="delivery-time-custom">
+                <label className="checkout-field">
+                  {copy.deliveryTimeChooseDate}
+                  <input
+                    className="checkout-input"
+                    type="date"
+                    value={deliveryDate}
+                    min={minOtherDeliveryDate}
+                    onChange={(e) => setDeliveryDate(e.target.value)}
+                  />
+                </label>
+                <label className="checkout-field">
+                  {copy.deliveryTimeChooseTime}
+                  <input
+                    className="checkout-input"
+                    type="time"
+                    value={deliveryClock}
+                    step={300}
+                    onChange={(e) => setDeliveryClock(e.target.value)}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="site-button site-button--primary"
+                  disabled={!deliveryDate || !deliveryClock}
+                  onClick={() => {
+                    if (!deliveryDate || !deliveryClock) return;
+                    setDeliveryTimeMode("other");
+                    setDeliveryTimeOpen(false);
+                  }}
+                >
+                  {copy.deliveryTimeApply}
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {confirmOpen ? (
+        <div className="site-popup" role="dialog" aria-modal="true">
+          <div className="site-popup__card">
+            <div className="site-popup__title">{copy.confirmTitle}</div>
+            <div className="site-popup__actions">
+              <button
+                className="site-button site-button--primary"
+                disabled={loading}
+                onClick={() => {
+                  setConfirmOpen(false);
+                  placeOrder();
+                }}
+              >
+                {copy.confirmYes}
+              </button>
+              <button
+                className="site-button site-button--ghost"
+                disabled={loading}
+                onClick={() => setConfirmOpen(false)}
+              >
+                {copy.confirmNo}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {successOpen ? (
         <div className="site-popup" role="dialog" aria-modal="true">

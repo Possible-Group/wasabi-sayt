@@ -28,6 +28,13 @@ function formatBirthdayDash(value?: string) {
   return `${match[3]}-${match[2]}-${match[1]}`;
 }
 
+function extractBirthdayParts(value?: string) {
+  if (!value) return null;
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!match) return null;
+  return { year: match[1], month: match[2], day: match[3] };
+}
+
 function toNumber(value: any): number | null {
   if (value === null || value === undefined) return null;
   if (typeof value === "number") return Number.isFinite(value) ? value : null;
@@ -296,6 +303,81 @@ export async function createPosterClient({
       try {
         const created = await tryCreate(method, payload);
         if (created) return created;
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        const isUnknown = /Unknown API method|Unknown method/i.test(message);
+        if (!lastError || !isUnknown || /Unknown API method|Unknown method/i.test(lastError)) {
+          lastError = message;
+        }
+      }
+    }
+  }
+
+  if (lastError) {
+    throw new Error(lastError);
+  }
+  return null;
+}
+
+export async function updatePosterClientBirthday({
+  clientId,
+  birthday,
+  phone,
+  name,
+}: {
+  clientId: string;
+  birthday: string;
+  phone?: string;
+  name?: string;
+}): Promise<PosterClient | null> {
+  const id = String(clientId || "").trim();
+  if (!id) return null;
+  const normalizedBirthday = String(birthday || "").trim();
+  if (!normalizedBirthday) return null;
+
+  const birthdayAlt = formatBirthdayAlt(normalizedBirthday);
+  const birthdayDash = formatBirthdayDash(normalizedBirthday);
+  const parts = extractBirthdayParts(normalizedBirthday);
+  const day = parts?.day;
+  const month = parts?.month;
+
+  const basePayloads: Array<Record<string, string | undefined>> = [
+    { client_id: id, phone, client_phone: phone, phone_number: phone, client_name: name },
+    { id, phone, client_phone: phone, phone_number: phone, client_name: name },
+  ];
+
+  const birthdayVariants = [normalizedBirthday, birthdayAlt, birthdayDash].filter(Boolean) as string[];
+  const payloads: Array<Record<string, string | undefined>> = [];
+
+  for (const base of basePayloads) {
+    for (const birth of birthdayVariants) {
+      payloads.push({ ...base, birthday: birth });
+      payloads.push({ ...base, birthdate: birth });
+      payloads.push({ ...base, birth_date: birth });
+    }
+    if (day && month) {
+      payloads.push({ ...base, birth_day: day, birth_month: month });
+      payloads.push({ ...base, birthday_day: day, birthday_month: month });
+    }
+  }
+
+  const methods = [
+    "clients.editClient",
+    "clients.updateClient",
+    "clients.edit",
+    "clients.update",
+    "clients.createOrUpdate",
+  ];
+
+  let lastError: string | null = null;
+  for (const method of methods) {
+    for (const payload of payloads) {
+      try {
+        const data = await posterFetch<any>(method, payload, { httpMethod: "POST" });
+        const clients = extractClients(data);
+        if (clients.length) return clients[0];
+        const maybe = data?.response ?? data;
+        if (maybe && typeof maybe === "object") return maybe as PosterClient;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         const isUnknown = /Unknown API method|Unknown method/i.test(message);

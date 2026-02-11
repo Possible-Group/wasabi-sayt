@@ -8,6 +8,8 @@ export type AboutLocation = {
   nameUz?: string | null;
   addressRu?: string | null;
   addressUz?: string | null;
+  pickupAddressRu?: string | null;
+  pickupAddressUz?: string | null;
   descRu?: string | null;
   descUz?: string | null;
   lat?: number | null;

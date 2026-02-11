@@ -6,6 +6,7 @@ import {
   getPosterClientById,
   normalizePhone,
   normalizePosterClient,
+  updatePosterClientBirthday,
 } from "@/lib/poster/posterClients";
 import { setClientSession } from "@/lib/auth/clientAuth";
 import { prisma } from "@/lib/db/prisma";
@@ -128,21 +129,32 @@ export async function POST(req: Request) {
     );
   }
 
-  if (posterWasExisting) {
-    const posterBirthday = normalizeBirthday(getPosterBirthday(client));
-    if (posterBirthday) {
-      if (!normalizedBirthday) {
-        return NextResponse.json({ error: "BIRTHDAY_REQUIRED" }, { status: 400 });
-      }
-      if (normalizedBirthday !== posterBirthday) {
-        return NextResponse.json({ error: "BIRTHDAY_MISMATCH" }, { status: 403 });
-      }
+  const posterBirthday = normalizeBirthday(getPosterBirthday(client));
+  if (posterWasExisting && posterBirthday) {
+    if (!normalizedBirthday) {
+      return NextResponse.json({ error: "BIRTHDAY_REQUIRED" }, { status: 400 });
+    }
+    if (normalizedBirthday !== posterBirthday) {
+      return NextResponse.json({ error: "BIRTHDAY_MISMATCH" }, { status: 403 });
     }
   }
 
   const normalized = normalizePosterClient(client);
   if (!normalized) {
     return NextResponse.json({ error: "CLIENT_CREATE_FAILED" }, { status: 500 });
+  }
+
+  if (!posterBirthday && normalizedBirthday) {
+    try {
+      await updatePosterClientBirthday({
+        clientId: normalized.id,
+        birthday: normalizedBirthday,
+        phone,
+        name: body.name,
+      });
+    } catch {
+      // ignore update errors
+    }
   }
 
   const fresh = await getPosterClientById(normalized.id);
