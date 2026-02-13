@@ -7,6 +7,7 @@ import { getClientSession } from "@/lib/auth/clientAuth";
 import { getPosterClientById, normalizePosterClient } from "@/lib/poster/posterClients";
 import { posterFetch } from "@/lib/poster/posterClient";
 import { cached } from "@/lib/poster/posterCache";
+import { sendEskizSms } from "@/lib/sms/eskiz";
 
 const PACKAGE_ITEM_ID = "package_fee";
 const CHOPSTICKS_ITEM_ID = "chopsticks";
@@ -139,6 +140,15 @@ function appendExtraComment(base: string, extra: string) {
   const trimmed = base.trim();
   if (!extra) return trimmed;
   return trimmed ? `${trimmed}\n${extra}` : extra;
+}
+
+function buildOrderSmsText(params: {
+  orderPublicId: string;
+  totalSum: number;
+  deliveryType: "delivery" | "pickup";
+}) {
+  const delivery = params.deliveryType === "delivery" ? "Доставка" : "Самовывоз";
+  return `Wasabi Sushi: заказ №${params.orderPublicId} принят. Сумма ${formatMoney(params.totalSum)}. ${delivery}.`;
 }
 
 async function sendTelegramNotification(message: string) {
@@ -398,6 +408,24 @@ export async function POST(req: Request) {
   ].join("\n");
 
   await sendTelegramNotification(telegramMessage);
+
+  const orderPublicId = apiJson?.order_id ? String(apiJson.order_id) : String(order.id);
+  const smsMessage = buildOrderSmsText({
+    orderPublicId,
+    totalSum,
+    deliveryType,
+  });
+  const smsResult = await sendEskizSms({
+    mobilePhone: customerPhone,
+    message: smsMessage,
+    userSmsId: String(order.id),
+  }).catch((error) => {
+    const detail = error instanceof Error ? error.message : String(error);
+    return { ok: false, error: detail };
+  });
+  if (!smsResult.ok && !smsResult.skipped) {
+    console.error("Eskiz SMS error:", smsResult.error || "UNKNOWN");
+  }
 
   return NextResponse.json({ ok: true, orderId: order.id });
 }

@@ -198,6 +198,9 @@ body.ws-body .ws-container{
   color: var(--site-ink);
   text-decoration: none;
 }
+.site-brand-phone span{
+  white-space: nowrap;
+}
 .site-brand-phone:hover{
   color: var(--site-ink);
 }
@@ -2377,12 +2380,19 @@ textarea.checkout-input{
 @media (max-width: 900px){
   .site-header__inner{
     padding: 12px 0;
-    display:grid;
-    grid-template-columns: 1fr auto 1fr;
+    display:flex;
     align-items:center;
+    justify-content:space-between;
+    gap: 10px;
   }
-  .site-brand-panel{ justify-self: center; }
-  .site-actions{ justify-self: end; }
+  .site-brand-panel{
+    min-width: 0;
+    flex: 0 1 auto;
+  }
+  .site-actions{
+    flex: 0 0 auto;
+    gap: 8px;
+  }
   .site-nav{ display:none; }
   .site-search{ display:none; }
   .site-burger{ display:grid; place-items:center; }
@@ -2457,12 +2467,45 @@ textarea.checkout-input{
 }
 
 @media (max-width: 640px){
-  body.ws-body .ws-container{ width: calc(100% - 20px); }
-  .site-header__inner{ gap: 12px; }
-  .site-brand-panel{ padding: 6px 10px; gap: 8px; }
-  .site-brand-divider{ height: 18px; }
-  .site-brand-phone{ font-size: 12px; gap: 6px; }
-  .site-brand__logo{ height: 34px; }
+  body.ws-body .ws-container{ width: calc(100% - 16px); }
+  .site-header__inner{ gap: 6px; }
+  .site-brand{
+    display: inline-flex;
+    flex: 0 0 auto;
+  }
+  .site-brand-panel{
+    padding: 7px 10px;
+    gap: 6px;
+    min-width: 0;
+    max-width: 54%;
+  }
+  .site-brand-divider{ display: none; }
+  .site-brand-phone{
+    font-size: 11px;
+    gap: 4px;
+    min-width: 0;
+  }
+  .site-brand-phone span{
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .site-actions{ gap: 4px; }
+  .site-icon,
+  .site-burger{
+    width: 34px;
+    height: 34px;
+    border-radius: 12px;
+  }
+  .site-locale a{
+    padding: 6px 8px;
+    font-size: 10px;
+    letter-spacing: 0.05em;
+  }
+  .site-brand__logo{
+    height: 30px;
+    width: 30px;
+    border-radius: 9px;
+  }
   .site-brand__name{ font-size: 18px; letter-spacing: 0.14em; }
   .site-brand__sub{ font-size: 11px; letter-spacing: 0.28em; }
   .site-header__promo{ font-size: 11px; padding: 6px 0; }
@@ -2616,5 +2659,28 @@ textarea.checkout-input{
   }
   .site-carousel__item{
     flex-basis: calc(50% - 7px);
+  }
+}
+
+@media (max-width: 380px){
+  .site-brand-panel{
+    max-width: 50%;
+    padding: 6px 8px;
+  }
+  .site-brand__logo{
+    width: 26px;
+    height: 26px;
+  }
+  .site-brand-phone{ font-size: 10px; }
+  .site-actions{ gap: 3px; }
+  .site-icon,
+  .site-burger{
+    width: 32px;
+    height: 32px;
+  }
+  .site-locale a{
+    padding: 5px 7px;
+    font-size: 9px;
+    letter-spacing: 0.04em;
   }
 }
