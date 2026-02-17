@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, type MouseEvent } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { isWithinWorkHours } from "@/lib/utils/timeWindow";
+import CartQuickBar from "@/components/layout/CartQuickBar";
 
 const COPY = {
   ru: {
@@ -406,60 +407,101 @@ export default function Header({ locale }: { locale: string }) {
                 className={isNews ? "is-active" : ""}
                 onClick={() => setOpen(false)}
               >
-                <NewsIcon />
-                {copy.sidebar.news} <span aria-hidden>→</span>
+                <span className="site-mobile__link-main">
+                  <span className="site-mobile__link-icon">
+                    <NewsIcon />
+                  </span>
+                  <span>{copy.sidebar.news}</span>
+                </span>
+                <span aria-hidden>→</span>
               </Link>
               <Link
                 href={`/${locale}/about`}
                 className={isAbout ? "is-active" : ""}
                 onClick={() => setOpen(false)}
               >
-                <InfoIcon />
-                {copy.sidebar.about} <span aria-hidden>→</span>
+                <span className="site-mobile__link-main">
+                  <span className="site-mobile__link-icon">
+                    <InfoIcon />
+                  </span>
+                  <span>{copy.sidebar.about}</span>
+                </span>
+                <span aria-hidden>→</span>
               </Link>
               <Link
                 href={`/${locale}/contacts`}
                 onClick={() => setOpen(false)}
               >
-                <span>📍</span>
-                {copy.sidebar.contacts} <span aria-hidden>→</span>
+                <span className="site-mobile__link-main">
+                  <span className="site-mobile__link-icon">
+                    <MapPinIcon />
+                  </span>
+                  <span>{copy.sidebar.contacts}</span>
+                </span>
+                <span aria-hidden>→</span>
               </Link>
               <Link
                 href={`/${locale}/vacancies`}
                 onClick={() => setOpen(false)}
               >
-                <span>💼</span>
-                {copy.sidebar.vacancies} <span aria-hidden>→</span>
+                <span className="site-mobile__link-main">
+                  <span className="site-mobile__link-icon">
+                    <BriefcaseIcon />
+                  </span>
+                  <span>{copy.sidebar.vacancies}</span>
+                </span>
+                <span aria-hidden>→</span>
               </Link>
               <Link
                 href={`/${locale}#products`}
                 onClick={() => setOpen(false)}
               >
-                <MenuIcon />
-                {copy.sidebar.menu} <span aria-hidden>→</span>
+                <span className="site-mobile__link-main">
+                  <span className="site-mobile__link-icon">
+                    <MenuIcon />
+                  </span>
+                  <span>{copy.sidebar.menu}</span>
+                </span>
+                <span aria-hidden>→</span>
               </Link>
               <Link
                 href={`/${locale}/delivery`}
                 onClick={() => setOpen(false)}
               >
-                <span>🚚</span>
-                {copy.sidebar.delivery} <span aria-hidden>→</span>
+                <span className="site-mobile__link-main">
+                  <span className="site-mobile__link-icon">
+                    <DeliveryTruckIcon />
+                  </span>
+                  <span>{copy.sidebar.delivery}</span>
+                </span>
+                <span aria-hidden>→</span>
               </Link>
               <Link
                 href={`/${locale}/promotions`}
                 onClick={() => setOpen(false)}
               >
-                <span>🔥</span>
-                {copy.sidebar.promo} <span aria-hidden>→</span>
+                <span className="site-mobile__link-main">
+                  <span className="site-mobile__link-icon">
+                    <PromoIcon />
+                  </span>
+                  <span>{copy.sidebar.promo}</span>
+                </span>
+                <span aria-hidden>→</span>
               </Link>
             </div>
 
             <div className="site-mobile__actions">
               <Link href={`/${locale}/account`} onClick={() => setOpen(false)}>
-                {copy.account}
+                <span className="site-mobile__action-main">
+                  <UserIcon />
+                  <span>{copy.account}</span>
+                </span>
               </Link>
               <Link href={`/${locale}/cart`} onClick={() => setOpen(false)}>
-                {copy.cart}
+                <span className="site-mobile__action-main">
+                  <CartIcon />
+                  <span>{copy.cart}</span>
+                </span>
               </Link>
               {clientLoggedIn ? (
                 <button type="button" onClick={handleLogout}>
@@ -492,6 +534,7 @@ export default function Header({ locale }: { locale: string }) {
         </div>
       </div>
     </header>
+      <CartQuickBar locale={locale} />
       {closed && (
         <div className="site-closed" role="status" aria-live="polite">
           <div className="site-closed__card">
@@ -606,6 +649,54 @@ function NewsIcon() {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
       <rect x="4" y="5" width="16" height="14" rx="2" stroke="currentColor" strokeWidth="1.5" />
       <path d="M8 9h8M8 12h8M8 15h6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function MapPinIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M12 21s7-6.5 7-12a7 7 0 1 0-14 0c0 5.5 7 12 7 12Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
+      <circle cx="12" cy="9" r="2.3" fill="currentColor" />
+    </svg>
+  );
+}
+
+function BriefcaseIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <rect x="4" y="7" width="16" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M4 12h16" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M9 7V6a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v1" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  );
+}
+
+function DeliveryTruckIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path d="M3 7h11v8H3V7Z" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M14 10h3l3 3v2h-6v-5Z" stroke="currentColor" strokeWidth="1.5" />
+      <circle cx="7.5" cy="17.5" r="1.6" fill="currentColor" />
+      <circle cx="17.5" cy="17.5" r="1.6" fill="currentColor" />
+    </svg>
+  );
+}
+
+function PromoIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden>
+      <path
+        d="M13.4 2 6 13h4l-1.2 9L18 10h-4.1L13.4 2Z"
+        stroke="currentColor"
+        strokeWidth="1.5"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }

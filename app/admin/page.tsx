@@ -2,6 +2,11 @@ import Link from "next/link";
 
 const quickLinks = [
   {
+    title: "Клиенты",
+    href: "/admin/clients",
+    description: "Список клиентов, логинов и хэшей паролей.",
+  },
+  {
     title: "Настройки",
     href: "/admin/settings",
     description: "Часы работы, сборы и переключатели языков.",

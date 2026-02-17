@@ -38,6 +38,10 @@ export default function CartPage() {
   const locale: Locale = isLocale(localeParam) ? localeParam : "ru";
   const [items, setItems] = useState<CartItem[]>([]);
   const [fees, setFees] = useState<{ delivery: number; pack: number }>({ delivery: 0, pack: 0 });
+  const [extraImages, setExtraImages] = useState<{ package: string; chopsticks: string }>({
+    package: "",
+    chopsticks: "",
+  });
 
   useEffect(() => setItems(getCart()), []);
   useEffect(() => {
@@ -48,8 +52,15 @@ export default function CartPage() {
           delivery: Number(meta?.settings?.delivery_fee ?? 0),
           pack: Number(meta?.settings?.package_fee ?? 0),
         });
+        setExtraImages({
+          package: String(meta?.settings?.package_image_url || "").trim(),
+          chopsticks: String(meta?.settings?.chopsticks_image_url || "").trim(),
+        });
       })
-      .catch(() => setFees({ delivery: 0, pack: 0 }));
+      .catch(() => {
+        setFees({ delivery: 0, pack: 0 });
+        setExtraImages({ package: "", chopsticks: "" });
+      });
   }, []);
 
   const packageLabel = locale === "uz" ? "Paket" : "Пакет";
@@ -92,9 +103,11 @@ export default function CartPage() {
       if (next.some(isPackageItem)) {
         const updated = next.map((it) =>
           isPackageItem(it)
-            ? it.price === packagePriceT && it.name === packageLabel && it.qty === 1
+            ? it.price === packagePriceT &&
+              it.name === packageLabel &&
+              it.qty === (it.qty > 0 ? Math.floor(it.qty) : 1)
               ? it
-              : { ...it, price: packagePriceT, name: packageLabel, qty: 1 }
+              : { ...it, price: packagePriceT, name: packageLabel, qty: it.qty > 0 ? Math.floor(it.qty) : 1 }
             : it
         );
         if (updated.some((it, idx) => it !== next[idx])) {
@@ -111,9 +124,11 @@ export default function CartPage() {
       if (next.some(isChopsticksItem)) {
         const updated = next.map((it) =>
           isChopsticksItem(it)
-            ? it.price === chopsticksPriceT && it.name === chopsticksLabel && it.qty === 1
+            ? it.price === chopsticksPriceT &&
+              it.name === chopsticksLabel &&
+              it.qty === (it.qty > 0 ? Math.floor(it.qty) : 1)
               ? it
-              : { ...it, price: chopsticksPriceT, name: chopsticksLabel, qty: 1 }
+              : { ...it, price: chopsticksPriceT, name: chopsticksLabel, qty: it.qty > 0 ? Math.floor(it.qty) : 1 }
             : it
         );
         if (updated.some((it, idx) => it !== next[idx])) {
@@ -132,40 +147,44 @@ export default function CartPage() {
     }
   }, [fees.pack, items, locale, packageLabel, packagePriceT, chopsticksLabel, chopsticksPriceT]);
 
-  function togglePackage() {
+  function setPackageQty(nextQty: number) {
     if (!hasProducts || fees.pack <= 0) return;
-    if (packageItem) {
+    if (nextQty <= 0) {
       setPackageOptOut(true);
       const next = items.filter((it) => !isPackageItem(it));
       setItems(next);
       setCart(next);
-    } else {
-      setPackageOptOut(false);
-      const next = [
-        ...items,
-        { product_id: PACKAGE_ITEM_ID, name: packageLabel, price: packagePriceT, qty: 1 },
-      ];
-      setItems(next);
-      setCart(next);
+      return;
     }
+    setPackageOptOut(false);
+    const safeQty = Math.max(1, Math.floor(nextQty));
+    const next = packageItem
+      ? items.map((it) =>
+          isPackageItem(it) ? { ...it, qty: safeQty, price: packagePriceT, name: packageLabel } : it
+        )
+      : [...items, { product_id: PACKAGE_ITEM_ID, name: packageLabel, price: packagePriceT, qty: safeQty }];
+    setItems(next);
+    setCart(next);
   }
 
-  function toggleChopsticks() {
+  function setChopsticksQty(nextQty: number) {
     if (!hasProducts) return;
-    if (chopsticksItem) {
+    if (nextQty <= 0) {
       setChopsticksOptOut(true);
       const next = items.filter((it) => !isChopsticksItem(it));
       setItems(next);
       setCart(next);
-    } else {
-      setChopsticksOptOut(false);
-      const next = [
-        ...items,
-        { product_id: CHOPSTICKS_ITEM_ID, name: chopsticksLabel, price: chopsticksPriceT, qty: 1 },
-      ];
-      setItems(next);
-      setCart(next);
+      return;
     }
+    setChopsticksOptOut(false);
+    const safeQty = Math.max(1, Math.floor(nextQty));
+    const next = chopsticksItem
+      ? items.map((it) =>
+          isChopsticksItem(it) ? { ...it, qty: safeQty, price: chopsticksPriceT, name: chopsticksLabel } : it
+        )
+      : [...items, { product_id: CHOPSTICKS_ITEM_ID, name: chopsticksLabel, price: chopsticksPriceT, qty: safeQty }];
+    setItems(next);
+    setCart(next);
   }
 
   return (
@@ -244,7 +263,11 @@ export default function CartPage() {
                 <div className="cart-row cart-row--package">
                   <div className="cart-item">
                     <div className="cart-thumb" aria-hidden>
-                      <div className="cart-thumb__empty" />
+                      {extraImages.chopsticks ? (
+                        <img src={extraImages.chopsticks} alt="" loading="lazy" decoding="async" />
+                      ) : (
+                        <div className="cart-thumb__empty" />
+                      )}
                     </div>
                     <div>
                       <div style={{ fontWeight: 700 }}>{chopsticksLabel}</div>
@@ -253,12 +276,21 @@ export default function CartPage() {
                       </div>
                     </div>
                   </div>
-                  <button
-                    className="cart-remove"
-                    onClick={toggleChopsticks}
-                  >
-                    {chopsticksItem ? (locale === "uz" ? "Olib tashlash" : "Убрать") : (locale === "uz" ? "Qo'shish" : "Добавить")}
-                  </button>
+                  {chopsticksItem ? (
+                    <div className="cart-qty">
+                      <button className="qty-btn" onClick={() => setChopsticksQty(chopsticksItem.qty - 1)}>
+                        −
+                      </button>
+                      <div style={{ width: 24, textAlign: "center", fontWeight: 700 }}>{chopsticksItem.qty}</div>
+                      <button className="qty-btn" onClick={() => setChopsticksQty(chopsticksItem.qty + 1)}>
+                        +
+                      </button>
+                    </div>
+                  ) : (
+                    <button className="cart-remove" onClick={() => setChopsticksQty(1)}>
+                      {locale === "uz" ? "Qo'shish" : "Добавить"}
+                    </button>
+                  )}
                 </div>
               ) : null}
 
@@ -266,21 +298,37 @@ export default function CartPage() {
                 <div className="cart-row cart-row--package">
                   <div className="cart-item">
                     <div className="cart-thumb" aria-hidden>
-                      <div className="cart-thumb__empty" />
+                      {extraImages.package ? (
+                        <img src={extraImages.package} alt="" loading="lazy" decoding="async" />
+                      ) : (
+                        <div className="cart-thumb__empty" />
+                      )}
                     </div>
                     <div>
                       <div style={{ fontWeight: 700 }}>{packageLabel}</div>
                       <div className="site-subtitle">
-                        {fees.pack.toLocaleString()} {currency}
+                        {(packagePriceT / 100).toLocaleString()} {currency}
+                        {packageItem && packageItem.qty > 1
+                          ? ` × ${packageItem.qty} = ${(packageItem.price * packageItem.qty / 100).toLocaleString()} ${currency}`
+                          : ""}
                       </div>
                     </div>
                   </div>
-                  <button
-                    className="cart-remove"
-                    onClick={togglePackage}
-                  >
-                    {packageItem ? (locale === "uz" ? "Olib tashlash" : "Убрать") : (locale === "uz" ? "Qo'shish" : "Добавить")}
-                  </button>
+                  {packageItem ? (
+                    <div className="cart-qty">
+                      <button className="qty-btn" onClick={() => setPackageQty(packageItem.qty - 1)}>
+                        −
+                      </button>
+                      <div style={{ width: 24, textAlign: "center", fontWeight: 700 }}>{packageItem.qty}</div>
+                      <button className="qty-btn" onClick={() => setPackageQty(packageItem.qty + 1)}>
+                        +
+                      </button>
+                    </div>
+                  ) : (
+                    <button className="cart-remove" onClick={() => setPackageQty(1)}>
+                      {locale === "uz" ? "Qo'shish" : "Добавить"}
+                    </button>
+                  )}
                 </div>
               ) : null}
 

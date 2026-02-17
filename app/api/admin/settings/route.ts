@@ -8,6 +8,8 @@ const Keys = [
   "work_end",
   "package_fee",
   "delivery_fee",
+  "package_image_url",
+  "chopsticks_image_url",
   "contact_phone",
   "contact_phone_2",
   "contact_phone_3",

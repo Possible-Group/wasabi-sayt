@@ -11,12 +11,14 @@ import {
 import { setClientSession } from "@/lib/auth/clientAuth";
 import { prisma } from "@/lib/db/prisma";
 import { hashPassword } from "@/lib/auth/password";
+import { verifyClientSmsOtp } from "@/lib/auth/clientSmsOtp";
 
 const Body = z.object({
   name: z.string().min(2),
   phone: z.string().min(6),
   birthday: z.string().optional().or(z.literal("")),
   password: z.string().min(1),
+  smsCode: z.string().optional(),
 });
 
 function normalizeBirthday(value?: string | null) {
@@ -97,6 +99,29 @@ export async function POST(req: Request) {
   });
   if (existingByPhone) {
     return NextResponse.json({ error: "CLIENT_ALREADY_REGISTERED" }, { status: 409 });
+  }
+
+  const smsCode = body.smsCode?.trim() || "";
+  if (!smsCode) {
+    return NextResponse.json({ error: "SMS_CODE_REQUIRED" }, { status: 400 });
+  }
+
+  const otpResult = await verifyClientSmsOtp({
+    purpose: "register",
+    phone,
+    code: smsCode,
+  });
+  if (!otpResult.ok) {
+    if (otpResult.error === "CODE_EXPIRED") {
+      return NextResponse.json({ error: "SMS_CODE_EXPIRED" }, { status: 400 });
+    }
+    if (otpResult.error === "CODE_NOT_FOUND") {
+      return NextResponse.json({ error: "SMS_CODE_NOT_FOUND" }, { status: 400 });
+    }
+    if (otpResult.error === "TOO_MANY_ATTEMPTS") {
+      return NextResponse.json({ error: "SMS_CODE_TOO_MANY_ATTEMPTS" }, { status: 429 });
+    }
+    return NextResponse.json({ error: "SMS_CODE_INVALID" }, { status: 400 });
   }
 
   let client = await findPosterClientByPhone(phone);

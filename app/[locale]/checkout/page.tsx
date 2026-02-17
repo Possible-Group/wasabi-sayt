@@ -61,6 +61,12 @@ type SavedLocation = {
   lng: number;
 };
 
+type GeoSearchResult = {
+  address: string;
+  lat: number;
+  lng: number;
+};
+
 const COPY = {
   ru: {
     loginTitle: "Войдите в аккаунт",
@@ -74,6 +80,11 @@ const COPY = {
     removeLocation: "Удалить",
     mapTitle: "Адрес доставки на карте",
     mapHint: "Кликните по карте, чтобы выбрать точку доставки.",
+    mapSearchLabel: "Поиск адреса",
+    mapSearchPlaceholder: "Например: Ташкент, Чиланзар 15 квартал",
+    mapSearchLoading: "Ищем адрес...",
+    mapSearchEmpty: "Ничего не найдено. Уточните запрос.",
+    mapSearchError: "Не удалось выполнить поиск адреса.",
     mapLoading: "Загружаем карту...",
     mapError: "Не удалось загрузить карту. Попробуйте позже.",
     myLocation: "Мое местоположение",
@@ -133,6 +144,11 @@ const COPY = {
     removeLocation: "O'chirish",
     mapTitle: "Yetkazish manzili",
     mapHint: "Xaritada yetkazish nuqtasini tanlang.",
+    mapSearchLabel: "Manzil qidirish",
+    mapSearchPlaceholder: "Masalan: Toshkent, Chilonzor 15-kvartal",
+    mapSearchLoading: "Manzil qidirilmoqda...",
+    mapSearchEmpty: "Hech narsa topilmadi. So'rovni aniqlashtiring.",
+    mapSearchError: "Manzilni qidirib bo'lmadi.",
     mapLoading: "Xarita yuklanmoqda...",
     mapError: "Xaritani yuklab bo'lmadi. Keyinroq urinib ko'ring.",
     myLocation: "Mening joylashuvim",
@@ -392,10 +408,17 @@ export default function CheckoutPage() {
 
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
   const [mapStatus, setMapStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [mapSearchQuery, setMapSearchQuery] = useState("");
+  const [mapSearchResults, setMapSearchResults] = useState<GeoSearchResult[]>([]);
+  const [mapSearchLoading, setMapSearchLoading] = useState(false);
+  const [mapSearchError, setMapSearchError] = useState("");
+  const [mapSearchTouched, setMapSearchTouched] = useState(false);
   const mapRef = useRef<HTMLDivElement | null>(null);
   const mapInstance = useRef<any>(null);
   const markerRef = useRef<any>(null);
   const addressRequestId = useRef(0);
+  const mapSearchRequestId = useRef(0);
+  const geoAutoAttempted = useRef(false);
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState("");
 
@@ -544,8 +567,24 @@ export default function CheckoutPage() {
   useEffect(() => {
     if (!showMap) {
       setMapStatus("idle");
+      setMapSearchLoading(false);
+      setMapSearchResults([]);
+      setMapSearchError("");
+      setMapSearchTouched(false);
     }
   }, [showMap]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (deliveryType !== "delivery") return;
+    if (geoAutoAttempted.current) return;
+    if (!navigator.geolocation) return;
+    if (selectedLocationId || coords || address.trim()) return;
+    if (savedLocations.length > 0) return;
+
+    geoAutoAttempted.current = true;
+    useMyLocation();
+  }, [deliveryType, selectedLocationId, coords, address, savedLocations.length]);
 
   function createPlacemark(ymaps: any, lat: number, lng: number, center = false) {
     const pos: [number, number] = [lat, lng];
@@ -679,6 +718,61 @@ export default function CheckoutPage() {
     return () => window.removeEventListener("resize", onResize);
   }, [mapStatus]);
 
+  useEffect(() => {
+    if (deliveryType !== "delivery" || !showMap) return;
+
+    const query = mapSearchQuery.trim();
+    if (query.length < 3) {
+      setMapSearchLoading(false);
+      setMapSearchResults([]);
+      setMapSearchError("");
+      return;
+    }
+
+    const reqId = ++mapSearchRequestId.current;
+    const lang = locale === "uz" ? "uz_UZ" : "ru_RU";
+    setMapSearchLoading(true);
+    setMapSearchError("");
+
+    const timer = window.setTimeout(async () => {
+      try {
+        const res = await fetch(
+          `/api/geocode?q=${encodeURIComponent(query)}&lang=${encodeURIComponent(lang)}`,
+          { cache: "no-store" }
+        );
+        const data = await res.json().catch(() => null);
+        if (!res.ok) throw new Error(String(data?.error || "SEARCH_FAILED"));
+        if (reqId !== mapSearchRequestId.current) return;
+
+        const list = Array.isArray(data?.results) ? data.results : [];
+        const normalized = list
+          .map((item: any) => ({
+            address: String(item?.address || "").trim(),
+            lat: Number(item?.lat),
+            lng: Number(item?.lng),
+          }))
+          .filter(
+            (item: GeoSearchResult) =>
+              Boolean(item.address) &&
+              Number.isFinite(item.lat) &&
+              Number.isFinite(item.lng)
+          )
+          .slice(0, 6);
+        setMapSearchResults(normalized);
+      } catch {
+        if (reqId !== mapSearchRequestId.current) return;
+        setMapSearchResults([]);
+        setMapSearchError(copy.mapSearchError);
+      } finally {
+        if (reqId === mapSearchRequestId.current) {
+          setMapSearchLoading(false);
+        }
+      }
+    }, 320);
+
+    return () => window.clearTimeout(timer);
+  }, [mapSearchQuery, showMap, deliveryType, locale, copy.mapSearchError]);
+
   async function resolveAddressByCoords(ymaps: any, lat: number, lng: number) {
     const apiAddress = await fetchAddressFromApi(lat, lng);
     if (apiAddress) return apiAddress;
@@ -767,6 +861,15 @@ export default function CheckoutPage() {
         .catch(() => undefined);
     }
     setShowMap(false);
+  }
+
+  function selectMapSearchResult(location: GeoSearchResult) {
+    setMapSearchQuery(location.address);
+    setMapSearchResults([]);
+    setMapSearchError("");
+    setMapSearchTouched(true);
+    setAddress(location.address);
+    applyCoords(location.lat, location.lng, window.ymaps, { center: true });
   }
 
   async function saveCurrentLocation() {
@@ -896,9 +999,11 @@ export default function CheckoutPage() {
       if (next.some(isPackageItem)) {
         const updated = next.map((it) =>
           isPackageItem(it)
-            ? it.price === packagePriceT && it.name === packageLabel && it.qty === 1
+            ? it.price === packagePriceT &&
+              it.name === packageLabel &&
+              it.qty === (it.qty > 0 ? Math.floor(it.qty) : 1)
               ? it
-              : { ...it, price: packagePriceT, name: packageLabel, qty: 1 }
+              : { ...it, price: packagePriceT, name: packageLabel, qty: it.qty > 0 ? Math.floor(it.qty) : 1 }
             : it
         );
         if (updated.some((it, idx) => it !== next[idx])) {
@@ -915,9 +1020,11 @@ export default function CheckoutPage() {
       if (next.some(isChopsticksItem)) {
         const updated = next.map((it) =>
           isChopsticksItem(it)
-            ? it.price === chopsticksPriceT && it.name === chopsticksLabel && it.qty === 1
+            ? it.price === chopsticksPriceT &&
+              it.name === chopsticksLabel &&
+              it.qty === (it.qty > 0 ? Math.floor(it.qty) : 1)
               ? it
-              : { ...it, price: chopsticksPriceT, name: chopsticksLabel, qty: 1 }
+              : { ...it, price: chopsticksPriceT, name: chopsticksLabel, qty: it.qty > 0 ? Math.floor(it.qty) : 1 }
             : it
         );
         if (updated.some((it, idx) => it !== next[idx])) {
@@ -1120,13 +1227,23 @@ export default function CheckoutPage() {
                 <div className="checkout-block">
                   <div className="checkout-location-head">
                     <div style={{ fontWeight: 600 }}>{copy.locationsTitle}</div>
-                    <button
-                      type="button"
-                      className="site-button site-button--ghost checkout-map-toggle"
-                      onClick={() => setShowMap((prev) => !prev)}
-                    >
-                      {showMap ? copy.hideMap : copy.addLocation}
-                    </button>
+                    <div className="checkout-location-head__actions">
+                      <button
+                        type="button"
+                        className="site-button site-button--ghost checkout-map-action"
+                        onClick={useMyLocation}
+                        disabled={geoLoading}
+                      >
+                        {geoLoading ? copy.myLocationLoading : copy.myLocation}
+                      </button>
+                      <button
+                        type="button"
+                        className="site-button site-button--ghost checkout-map-toggle"
+                        onClick={() => setShowMap((prev) => !prev)}
+                      >
+                        {showMap ? copy.hideMap : copy.addLocation}
+                      </button>
+                    </div>
                   </div>
 
                   {savedLocations.length === 0 ? (
@@ -1180,6 +1297,41 @@ export default function CheckoutPage() {
                         </button>
                       </div>
                       {geoError ? <div className="site-subtitle">{geoError}</div> : null}
+                      <label className="checkout-field">
+                        {copy.mapSearchLabel}
+                        <input
+                          className="checkout-input"
+                          value={mapSearchQuery}
+                          onChange={(e) => {
+                            setMapSearchTouched(true);
+                            setMapSearchQuery(e.target.value);
+                          }}
+                          placeholder={copy.mapSearchPlaceholder}
+                        />
+                      </label>
+                      {mapSearchLoading ? (
+                        <div className="site-subtitle">{copy.mapSearchLoading}</div>
+                      ) : mapSearchError ? (
+                        <div className="site-subtitle">{mapSearchError}</div>
+                      ) : mapSearchTouched && mapSearchQuery.trim().length >= 3 ? (
+                        mapSearchResults.length > 0 ? (
+                          <div className="checkout-map-search-list">
+                            {mapSearchResults.map((loc, idx) => (
+                              <button
+                                key={`${loc.lat}:${loc.lng}:${idx}`}
+                                type="button"
+                                className="checkout-map-search-item"
+                                onClick={() => selectMapSearchResult(loc)}
+                              >
+                                <span>{loc.address}</span>
+                                <span className="site-subtitle">{formatCoords(loc.lat, loc.lng)}</span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="site-subtitle">{copy.mapSearchEmpty}</div>
+                        )
+                      ) : null}
                       {mapStatus === "error" ? (
                         <div className="checkout-map checkout-map__fallback">{copy.mapError}</div>
                       ) : (

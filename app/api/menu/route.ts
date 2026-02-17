@@ -77,6 +77,8 @@ export async function GET() {
       work_end: setMap["work_end"] || "23:00",
       package_fee: Number(setMap["package_fee"] || 0),
       delivery_fee: Number(setMap["delivery_fee"] || 0),
+      package_image_url: setMap["package_image_url"] || "",
+      chopsticks_image_url: setMap["chopsticks_image_url"] || "",
       contact_phone: setMap["contact_phone"] || "",
       contact_phone_2: setMap["contact_phone_2"] || "",
       contact_phone_3: setMap["contact_phone_3"] || "",

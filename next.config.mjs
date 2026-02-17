@@ -23,11 +23,14 @@ const posterPattern = posterUrl
     }
   : null;
 
+const distDir = process.env.NEXT_DIST_DIR?.trim() || ".next";
+
 // =========================
 // NEXT CONFIG
 // =========================
 const nextConfig = {
   reactStrictMode: true,
+  distDir,
 
   /**
    * MUHIM:

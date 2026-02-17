@@ -124,6 +124,53 @@ export default function AdminSettingsPage() {
       </section>
 
       <section className="admin-card stack">
+        <div style={{ fontWeight: 600 }}>Фото для корзины</div>
+        <div className="admin-grid">
+          <div className="admin-card stack" style={{ boxShadow: "none" }}>
+            <label className="admin-field">
+              Фото: Палочки (URL)
+              <input
+                className="admin-input"
+                placeholder="https://... или /uploads/..."
+                value={v("chopsticks_image_url", "")}
+                onChange={(e) => setS((p) => ({ ...p, chopsticks_image_url: e.target.value }))}
+                onBlur={() => save("chopsticks_image_url", v("chopsticks_image_url", ""))}
+              />
+            </label>
+            <div className="admin-thumb" style={{ width: 120, height: 120 }}>
+              {v("chopsticks_image_url", "") ? (
+                <img src={v("chopsticks_image_url", "")} alt="Палочки" />
+              ) : (
+                <div className="admin-thumb__empty">Нет фото</div>
+              )}
+            </div>
+          </div>
+          <div className="admin-card stack" style={{ boxShadow: "none" }}>
+            <label className="admin-field">
+              Фото: Пакет (URL)
+              <input
+                className="admin-input"
+                placeholder="https://... или /uploads/..."
+                value={v("package_image_url", "")}
+                onChange={(e) => setS((p) => ({ ...p, package_image_url: e.target.value }))}
+                onBlur={() => save("package_image_url", v("package_image_url", ""))}
+              />
+            </label>
+            <div className="admin-thumb" style={{ width: 120, height: 120 }}>
+              {v("package_image_url", "") ? (
+                <img src={v("package_image_url", "")} alt="Пакет" />
+              ) : (
+                <div className="admin-thumb__empty">Нет фото</div>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="admin-subtitle">
+          Можно указать ссылку на картинку или путь вида <code>/uploads/...</code>.
+        </div>
+      </section>
+
+      <section className="admin-card stack">
         <div style={{ fontWeight: 600 }}>Контакты</div>
         <label className="admin-field">
           Телефон

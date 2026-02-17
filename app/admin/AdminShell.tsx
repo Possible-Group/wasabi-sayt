@@ -13,6 +13,7 @@ type AdminNavItem = {
 
 const NAV_ITEMS: AdminNavItem[] = [
   { href: "/admin", label: "Дашборд" },
+  { href: "/admin/clients", label: "Клиенты" },
   { href: "/admin/settings", label: "Настройки" },
   { href: "/admin/translations", label: "Переводы" },
   { href: "/admin/categories", label: "Категории" },

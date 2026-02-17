@@ -4,9 +4,9 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "NEXT_DIST_DIR=.next-dev env -u NODE_OPTIONS next dev",
+    "build": "NEXT_DIST_DIR=.next env -u NODE_OPTIONS next build",
+    "start": "NEXT_DIST_DIR=.next env -u NODE_OPTIONS next start",
     "lint": "next lint",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",

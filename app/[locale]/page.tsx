@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db/prisma";
 import Header from "@/components/layout/Header";
 import Footer from "@/components/layout/Footer";
 import BannerCarousel from "@/components/home/BannerCarousel";
+import ProductTile from "@/components/home/ProductTile";
 import Link from "next/link";
 import Image from "next/image";
 import { headers } from "next/headers";
@@ -21,6 +22,7 @@ type ProductCard = {
   id: string;
   title: string;
   price: string;
+  priceValue: number;
   image: string;
   href?: string;
   categoryId?: string | null;
@@ -433,20 +435,20 @@ export default async function HomePage({
   const topProductsFallback: ProductCard[] =
     locale === "uz"
       ? [
-          { id: "p1", title: "Losos maki", price: "29 000 so'm", image: svgDataUrl("Maki") },
-          { id: "p2", title: "Filadelfiya 4 dona", price: "35 000 so'm", image: svgDataUrl("Philadelphia") },
-          { id: "p3", title: "Avokado roll", price: "27 000 so'm", image: svgDataUrl("Avocado") },
-          { id: "p4", title: "Tempura miks", price: "32 000 so'm", image: svgDataUrl("Tempura") },
-          { id: "p5", title: "Tovuq seti", price: "58 000 so'm", image: svgDataUrl("Set") },
-          { id: "p6", title: "Issiq ramen", price: "41 000 so'm", image: svgDataUrl("Ramen") },
+          { id: "p1", title: "Losos maki", price: "29 000 so'm", priceValue: 2_900_000, image: svgDataUrl("Maki") },
+          { id: "p2", title: "Filadelfiya 4 dona", price: "35 000 so'm", priceValue: 3_500_000, image: svgDataUrl("Philadelphia") },
+          { id: "p3", title: "Avokado roll", price: "27 000 so'm", priceValue: 2_700_000, image: svgDataUrl("Avocado") },
+          { id: "p4", title: "Tempura miks", price: "32 000 so'm", priceValue: 3_200_000, image: svgDataUrl("Tempura") },
+          { id: "p5", title: "Tovuq seti", price: "58 000 so'm", priceValue: 5_800_000, image: svgDataUrl("Set") },
+          { id: "p6", title: "Issiq ramen", price: "41 000 so'm", priceValue: 4_100_000, image: svgDataUrl("Ramen") },
         ]
       : [
-          { id: "p1", title: "Суши с лососем", price: "29 000 сум", image: svgDataUrl("Лосось") },
-          { id: "p2", title: "Филадельфия 4 шт", price: "35 000 сум", image: svgDataUrl("Филадельфия") },
-          { id: "p3", title: "Авокадо ролл", price: "27 000 сум", image: svgDataUrl("Авокадо") },
-          { id: "p4", title: "Темпура микс", price: "32 000 сум", image: svgDataUrl("Темпура") },
-          { id: "p5", title: "Сет с курицей", price: "58 000 сум", image: svgDataUrl("Сет") },
-          { id: "p6", title: "Горячий рамэн", price: "41 000 сум", image: svgDataUrl("Рамэн") },
+          { id: "p1", title: "Суши с лососем", price: "29 000 сум", priceValue: 2_900_000, image: svgDataUrl("Лосось") },
+          { id: "p2", title: "Филадельфия 4 шт", price: "35 000 сум", priceValue: 3_500_000, image: svgDataUrl("Филадельфия") },
+          { id: "p3", title: "Авокадо ролл", price: "27 000 сум", priceValue: 2_700_000, image: svgDataUrl("Авокадо") },
+          { id: "p4", title: "Темпура микс", price: "32 000 сум", priceValue: 3_200_000, image: svgDataUrl("Темпура") },
+          { id: "p5", title: "Сет с курицей", price: "58 000 сум", priceValue: 5_800_000, image: svgDataUrl("Сет") },
+          { id: "p6", title: "Горячий рамэн", price: "41 000 сум", priceValue: 4_100_000, image: svgDataUrl("Рамэн") },
         ];
 
   const topProductsPromise: Promise<ProductCard[]> = (async () => {
@@ -466,7 +468,8 @@ export default async function HomePage({
             ? translated.trim()
             : cleanName || (locale === "uz" ? "Taom" : "Товар");
 
-        const priceNum = Number(p.price ?? 0);
+        const priceNumRaw = Number(p.price ?? 0);
+        const priceNum = Number.isFinite(priceNumRaw) ? priceNumRaw : 0;
         const price = `${(priceNum / 100).toLocaleString()} ${currency}`;
 
         const imgRaw = String(p.photo_origin ?? p.photo ?? p.image ?? "").trim();
@@ -483,6 +486,7 @@ export default async function HomePage({
           id,
           title,
           price,
+          priceValue: priceNum,
           image: img,
           href: `/${locale}/menu/${encodeURIComponent(id)}`,
           categoryId,
@@ -693,41 +697,15 @@ export default async function HomePage({
             </div>
 
             <div className="site-grid site-grid-4" role="list">
-              {popularProducts.map((prod, idx) => {
-                const content = (
-                  <>
-                    <div className="site-product-card__img">
-                      <img src={prod.image} alt={prod.title} loading="lazy" decoding="async" />
-                    </div>
-                    <div className="site-product-card__title">{prod.title}</div>
-                    <div className="site-product-card__price">{prod.price}</div>
-                    <div className="site-product-card__actions">
-                      <span className="site-button site-button--ghost">{copy.addToCart}</span>
-                    </div>
-                  </>
-                );
-
-                return prod.href ? (
-                  <Link
-                    key={prod.id}
-                    href={prod.href}
-                    className={`site-product-card site-reveal ${revealDelay(idx)}`}
-                    role="listitem"
-                    aria-label={prod.title}
-                  >
-                    {content}
-                  </Link>
-                ) : (
-                  <div
-                    key={prod.id}
-                    className={`site-product-card site-reveal ${revealDelay(idx)}`}
-                    role="listitem"
-                    aria-label={prod.title}
-                  >
-                    {content}
-                  </div>
-                );
-              })}
+              {popularProducts.map((prod, idx) => (
+                <ProductTile
+                  key={prod.id}
+                  product={prod}
+                  className={`site-product-card site-reveal ${revealDelay(idx)}`}
+                  addLabel={copy.addToCart}
+                  locale={locale}
+                />
+              ))}
             </div>
           </div>
         </section>
@@ -762,41 +740,15 @@ export default async function HomePage({
                         {title}
                       </h3>
                       <div className="site-grid site-grid-4 site-grid-compact" role="list">
-                        {items.map((prod, idx) => {
-                          const content = (
-                            <>
-                              <div className="site-product-card__img">
-                                <img src={prod.image} alt={prod.title} loading="lazy" decoding="async" />
-                              </div>
-                              <div className="site-product-card__title">{prod.title}</div>
-                              <div className="site-product-card__price">{prod.price}</div>
-                              <div className="site-product-card__actions">
-                                <span className="site-button site-button--ghost">{copy.addToCart}</span>
-                              </div>
-                            </>
-                          );
-
-                          return prod.href ? (
-                            <Link
-                              key={prod.id}
-                              href={prod.href}
-                              className={`site-product-card site-reveal ${revealDelay(idx)}`}
-                              role="listitem"
-                              aria-label={prod.title}
-                            >
-                              {content}
-                            </Link>
-                          ) : (
-                            <div
-                              key={prod.id}
-                              className={`site-product-card site-reveal ${revealDelay(idx)}`}
-                              role="listitem"
-                              aria-label={prod.title}
-                            >
-                              {content}
-                            </div>
-                          );
-                        })}
+                        {items.map((prod, idx) => (
+                          <ProductTile
+                            key={prod.id}
+                            product={prod}
+                            className={`site-product-card site-reveal ${revealDelay(idx)}`}
+                            addLabel={copy.addToCart}
+                            locale={locale}
+                          />
+                        ))}
                       </div>
                     </div>
                   );
