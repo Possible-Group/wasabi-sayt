@@ -154,19 +154,33 @@ export async function POST(req: Request) {
     );
   }
 
-  const posterBirthday = normalizeBirthday(getPosterBirthday(client));
+  const normalized = normalizePosterClient(client);
+  if (!normalized) {
+    return NextResponse.json({ error: "CLIENT_CREATE_FAILED" }, { status: 500 });
+  }
+
+  let posterBirthday = normalizeBirthday(getPosterBirthday(client));
   if (posterWasExisting && posterBirthday) {
     if (!normalizedBirthday) {
       return NextResponse.json({ error: "BIRTHDAY_REQUIRED" }, { status: 400 });
     }
     if (normalizedBirthday !== posterBirthday) {
-      return NextResponse.json({ error: "BIRTHDAY_MISMATCH" }, { status: 403 });
+      try {
+        await updatePosterClientBirthday({
+          clientId: normalized.id,
+          birthday: normalizedBirthday,
+          phone,
+          name: body.name,
+        });
+        const refreshed = await getPosterClientById(normalized.id);
+        if (refreshed) {
+          client = refreshed;
+          posterBirthday = normalizeBirthday(getPosterBirthday(refreshed));
+        }
+      } catch (error) {
+        console.error("Poster birthday update failed on mismatch:", error);
+      }
     }
-  }
-
-  const normalized = normalizePosterClient(client);
-  if (!normalized) {
-    return NextResponse.json({ error: "CLIENT_CREATE_FAILED" }, { status: 500 });
   }
 
   if (!posterBirthday && normalizedBirthday) {

@@ -26,6 +26,7 @@ type ClientProfile = {
     phoneLabel: "Телефон",
     passwordLabel: "Пароль",
     newPasswordLabel: "Новый пароль",
+    confirmPasswordLabel: "Подтвердите пароль",
     smsCodeLabel: "Код из SMS",
     birthdayLabel: "Дата рождения",
     birthdayDay: "День",
@@ -37,10 +38,13 @@ type ClientProfile = {
     forgotPassword: "Забыли пароль?",
     resetPasswordBtn: "Сбросить пароль",
     verifyCodeBtn: "Подтвердить код",
+    savePasswordBtn: "Сохранить пароль",
     closeBtn: "Закрыть",
     codePopupTitleRegister: "Подтверждение регистрации",
     codePopupTitleReset: "Подтверждение сброса пароля",
     codePopupText: "Введите код из SMS, чтобы продолжить.",
+    resetPopupTitle: "Новый пароль",
+    resetPopupText: "Введите и подтвердите новый пароль.",
     codeSaved: "Код подтвержден.",
     profileTitle: "Профиль",
     bonusLabel: "Бонусы",
@@ -50,7 +54,7 @@ type ClientProfile = {
     passwordPlaceholder: "Введите пароль",
     smsCodePlaceholder: "123456",
     birthdayPlaceholder: "1995-05-20",
-    forgotText: "Введите телефон, код из SMS и новый пароль.",
+    forgotText: "Введите телефон. Мы отправим SMS и попросим подтвердить код.",
     smsSent: "Код отправлен по SMS.",
     resetSuccess: "Пароль обновлён. Теперь можно войти.",
     clientNotFound: "Клиент не найден. Зарегистрируйтесь.",
@@ -67,6 +71,7 @@ type ClientProfile = {
     smsServiceUnavailable: "SMS-сервис временно недоступен.",
     smsSendFailed: "Не удалось отправить SMS. Попробуйте позже.",
     smsTemplateNotApproved: "Текст SMS не прошел модерацию в Eskiz. Сначала добавьте шаблон в my.eskiz.uz.",
+    passwordsMismatch: "Пароли не совпадают.",
     birthdayRequired: "Введите дату рождения для подтверждения.",
     birthdayMismatch: "Дата рождения не совпадает с данными в Poster.",
   },
@@ -82,6 +87,7 @@ type ClientProfile = {
     phoneLabel: "Telefon",
     passwordLabel: "Parol",
     newPasswordLabel: "Yangi parol",
+    confirmPasswordLabel: "Parolni tasdiqlang",
     smsCodeLabel: "SMS kodi",
     birthdayLabel: "Tug'ilgan sana",
     birthdayDay: "Kun",
@@ -93,10 +99,13 @@ type ClientProfile = {
     forgotPassword: "Parolni unutdingizmi?",
     resetPasswordBtn: "Parolni tiklash",
     verifyCodeBtn: "Kodni tasdiqlash",
+    savePasswordBtn: "Parolni saqlash",
     closeBtn: "Yopish",
     codePopupTitleRegister: "Ro'yxatdan o'tishni tasdiqlash",
     codePopupTitleReset: "Parol tiklashni tasdiqlash",
     codePopupText: "Davom etish uchun SMS kodni kiriting.",
+    resetPopupTitle: "Yangi parol",
+    resetPopupText: "Yangi parolni kiriting va tasdiqlang.",
     codeSaved: "Kod tasdiqlandi.",
     profileTitle: "Profil",
     bonusLabel: "Bonuslar",
@@ -106,7 +115,7 @@ type ClientProfile = {
     passwordPlaceholder: "Parolni kiriting",
     smsCodePlaceholder: "123456",
     birthdayPlaceholder: "1995-05-20",
-    forgotText: "Telefon, SMS kod va yangi parolni kiriting.",
+    forgotText: "Telefonni kiriting. SMS yuboramiz va kodni tasdiqlaysiz.",
     smsSent: "Kod SMS orqali yuborildi.",
     resetSuccess: "Parol yangilandi. Endi tizimga kirishingiz mumkin.",
     clientNotFound: "Mijoz topilmadi. Ro'yxatdan o'ting.",
@@ -123,6 +132,7 @@ type ClientProfile = {
     smsServiceUnavailable: "SMS xizmati vaqtincha ishlamayapti.",
     smsSendFailed: "SMS yuborilmadi. Keyinroq urinib ko'ring.",
     smsTemplateNotApproved: "Eskizda SMS matni moderatsiyadan o'tmagan. Avval shablonni my.eskiz.uz da tasdiqlang.",
+    passwordsMismatch: "Parollar mos kelmadi.",
     birthdayRequired: "Tasdiqlash uchun tug'ilgan sanani kiriting.",
     birthdayMismatch: "Tug'ilgan sana Poster ma'lumotlariga mos kelmadi.",
   },
@@ -168,13 +178,15 @@ export default function AccountPage() {
   const [regBirthDay, setRegBirthDay] = useState("");
   const [regBirthMonth, setRegBirthMonth] = useState("");
   const [regBirthYear, setRegBirthYear] = useState("");
-  const [regSmsCode, setRegSmsCode] = useState("");
 
   const [showForgot, setShowForgot] = useState(false);
   const [resetPhone, setResetPhone] = useState("");
   const [resetCode, setResetCode] = useState("");
   const [resetPassword, setResetPassword] = useState("");
+  const [resetPasswordConfirm, setResetPasswordConfirm] = useState("");
   const [showResetPassword, setShowResetPassword] = useState(false);
+  const [showResetPasswordConfirm, setShowResetPasswordConfirm] = useState(false);
+  const [showResetPasswordPopup, setShowResetPasswordPopup] = useState(false);
   const [smsModalKind, setSmsModalKind] = useState<"register" | "reset" | null>(null);
   const [smsModalCode, setSmsModalCode] = useState("");
   const smsModalInputRef = useRef<HTMLInputElement | null>(null);
@@ -277,6 +289,8 @@ export default function AccountPage() {
         return copy.smsSendFailed;
       case "SMS_TEMPLATE_NOT_APPROVED":
         return copy.smsTemplateNotApproved;
+      case "PASSWORDS_MISMATCH":
+        return copy.passwordsMismatch;
       default:
         return locale === "uz" ? "Xatolik" : "Ошибка";
     }
@@ -312,8 +326,33 @@ export default function AccountPage() {
     }
   }
 
-  async function handleSendRegisterCode() {
-    if (!regPhone.trim()) return;
+  async function completeRegister(smsCode: string) {
+    const r = await fetch("/api/auth/client/register", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        name: regName.trim(),
+        phone: regPhone.trim(),
+        birthday: regBirthday || "",
+        password: regPassword.trim(),
+        smsCode,
+      }),
+    });
+    const data = await r.json().catch(() => null);
+    if (!r.ok) {
+      setError(getErrorText(data?.error));
+      return;
+    }
+    setClient(data?.client || null);
+    setLoginPhone(regPhone.trim());
+    setLoginPassword("");
+    setRegPassword("");
+    setSmsModalCode("");
+    setSmsModalKind(null);
+  }
+
+  async function handleRegister() {
+    if (!regName.trim() || !regPhone.trim() || !regPassword.trim()) return;
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -325,10 +364,16 @@ export default function AccountPage() {
       });
       const data = await r.json().catch(() => null);
       if (!r.ok) {
+        if (data?.error === "SMS_RESEND_TOO_EARLY") {
+          setSmsModalCode("");
+          setSmsModalKind("register");
+          setNotice(copy.smsResendTooEarly);
+          return;
+        }
         setError(getErrorText(data?.error));
         return;
       }
-      setSmsModalCode(regSmsCode);
+      setSmsModalCode("");
       setSmsModalKind("register");
       setNotice(copy.smsSent);
     } catch {
@@ -338,45 +383,7 @@ export default function AccountPage() {
     }
   }
 
-  async function handleRegister() {
-    if (!regName.trim() || !regPhone.trim() || !regPassword.trim()) return;
-    if (!regSmsCode.trim()) {
-      setError(copy.smsCodeRequired);
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    setNotice(null);
-    try {
-      const r = await fetch("/api/auth/client/register", {
-        method: "POST",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          name: regName.trim(),
-          phone: regPhone.trim(),
-          birthday: regBirthday || "",
-          password: regPassword.trim(),
-          smsCode: regSmsCode.trim(),
-        }),
-      });
-      const data = await r.json().catch(() => null);
-      if (!r.ok) {
-        setError(getErrorText(data?.error));
-        return;
-      }
-      setClient(data?.client || null);
-      setLoginPhone(regPhone.trim());
-      setLoginPassword("");
-      setRegPassword("");
-      setRegSmsCode("");
-    } catch {
-      setError(getErrorText());
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleSendResetCode() {
+  async function handleStartResetPassword() {
     if (!resetPhone.trim()) return;
     setBusy(true);
     setError(null);
@@ -389,10 +396,18 @@ export default function AccountPage() {
       });
       const data = await r.json().catch(() => null);
       if (!r.ok) {
+        if (data?.error === "SMS_RESEND_TOO_EARLY") {
+          setShowForgot(false);
+          setSmsModalCode("");
+          setSmsModalKind("reset");
+          setNotice(copy.smsResendTooEarly);
+          return;
+        }
         setError(getErrorText(data?.error));
         return;
       }
-      setSmsModalCode(resetCode);
+      setShowForgot(false);
+      setSmsModalCode("");
       setSmsModalKind("reset");
       setNotice(copy.smsSent);
     } catch {
@@ -403,7 +418,13 @@ export default function AccountPage() {
   }
 
   async function handleResetPassword() {
-    if (!resetPhone.trim() || !resetCode.trim() || !resetPassword.trim()) return;
+    const newPassword = resetPassword.trim();
+    const confirmPassword = resetPasswordConfirm.trim();
+    if (!resetPhone.trim() || !resetCode.trim() || !newPassword || !confirmPassword) return;
+    if (newPassword !== confirmPassword) {
+      setError(copy.passwordsMismatch);
+      return;
+    }
     setBusy(true);
     setError(null);
     setNotice(null);
@@ -414,7 +435,7 @@ export default function AccountPage() {
         body: JSON.stringify({
           phone: resetPhone.trim(),
           code: resetCode.trim(),
-          password: resetPassword.trim(),
+          password: newPassword,
         }),
       });
       const data = await r.json().catch(() => null);
@@ -422,12 +443,14 @@ export default function AccountPage() {
         setError(getErrorText(data?.error));
         return;
       }
-      setClient(data?.client || null);
       setShowForgot(false);
+      setShowResetPasswordPopup(false);
       setResetCode("");
       setResetPassword("");
+      setResetPasswordConfirm("");
       setLoginPhone(resetPhone.trim());
       setLoginPassword("");
+      setMode("login");
       setNotice(copy.resetSuccess);
     } catch {
       setError(getErrorText());
@@ -448,16 +471,36 @@ export default function AccountPage() {
     }
   }
 
-  function handleApplySmsCode() {
+  async function handleApplySmsCode() {
     const normalizedCode = smsModalCode.replace(/\D/g, "").slice(0, 8);
     if (!normalizedCode) {
       setError(copy.smsCodeRequired);
       return;
     }
     if (smsModalKind === "register") {
-      setRegSmsCode(normalizedCode);
+      setBusy(true);
+      setError(null);
+      setNotice(null);
+      try {
+        await completeRegister(normalizedCode);
+      } catch {
+        setError(getErrorText());
+      } finally {
+        setBusy(false);
+      }
+      return;
     } else if (smsModalKind === "reset") {
       setResetCode(normalizedCode);
+      setSmsModalKind(null);
+      setSmsModalCode("");
+      setResetPassword("");
+      setResetPasswordConfirm("");
+      setShowResetPassword(false);
+      setShowResetPasswordConfirm(false);
+      setShowResetPasswordPopup(true);
+      setError(null);
+      setNotice(null);
+      return;
     }
     setError(null);
     setNotice(copy.codeSaved);
@@ -584,99 +627,14 @@ export default function AccountPage() {
                         type="button"
                         className="site-button site-button--ghost account-forgot-toggle"
                         onClick={() => {
-                          setShowForgot((prev) => !prev);
+                          setShowForgot(true);
+                          setShowResetPasswordPopup(false);
                           setError(null);
                           setNotice(null);
                         }}
                       >
                         {copy.forgotPassword}
                       </button>
-                      {showForgot && (
-                        <div className="account-forgot">
-                          <div className="account-card__text">{copy.forgotText}</div>
-                          <label className="account-field">
-                            {copy.phoneLabel}
-                            <input
-                              className="account-input"
-                              type="tel"
-                              inputMode="tel"
-                              value={resetPhone}
-                              onChange={(e) => setResetPhone(e.target.value)}
-                              placeholder={copy.phonePlaceholder}
-                            />
-                          </label>
-                          <label className="account-field">
-                            {copy.newPasswordLabel}
-                            <div className="account-password">
-                              <input
-                                className="account-input"
-                                type={showResetPassword ? "text" : "password"}
-                                value={resetPassword}
-                                onChange={(e) => setResetPassword(e.target.value)}
-                                placeholder={copy.passwordPlaceholder}
-                              />
-                              <button
-                                type="button"
-                                className="account-password__toggle"
-                                aria-label={showResetPassword ? "Скрыть пароль" : "Показать пароль"}
-                                aria-pressed={showResetPassword}
-                                onClick={() => setShowResetPassword((prev) => !prev)}
-                              >
-                                <svg viewBox="0 0 24 24" aria-hidden="true">
-                                  <path
-                                    d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"
-                                    fill="none"
-                                    stroke="currentColor"
-                                    strokeWidth="1.7"
-                                    strokeLinecap="round"
-                                    strokeLinejoin="round"
-                                  />
-                                  <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.7" />
-                                  {!showResetPassword && (
-                                    <path
-                                      d="M4 4l16 16"
-                                      fill="none"
-                                      stroke="currentColor"
-                                      strokeWidth="1.7"
-                                      strokeLinecap="round"
-                                    />
-                                  )}
-                                </svg>
-                              </button>
-                            </div>
-                          </label>
-                          <div className="account-inline-actions">
-                            <button
-                              type="button"
-                              className="site-button site-button--ghost"
-                              disabled={busy}
-                              onClick={handleSendResetCode}
-                            >
-                              {copy.sendCodeBtn}
-                            </button>
-                            <button
-                              type="button"
-                              className="site-button site-button--ghost"
-                              disabled={busy}
-                              onClick={() => {
-                                setSmsModalCode(resetCode);
-                                setSmsModalKind("reset");
-                                setError(null);
-                              }}
-                            >
-                              {copy.smsCodeLabel}
-                            </button>
-                            <button
-                              type="button"
-                              className="site-button site-button--primary"
-                              disabled={busy}
-                              onClick={handleResetPassword}
-                            >
-                              {copy.resetPasswordBtn}
-                            </button>
-                          </div>
-                        </div>
-                      )}
                       {notice && <div className="account-message">{notice}</div>}
                       {error && <div className="account-message is-error">{error}</div>}
                       <button
@@ -751,26 +709,6 @@ export default function AccountPage() {
                           </button>
                         </div>
                       </label>
-                      <button
-                        type="button"
-                        className="site-button site-button--ghost"
-                        disabled={busy}
-                        onClick={handleSendRegisterCode}
-                      >
-                        {copy.sendCodeBtn}
-                      </button>
-                      <button
-                        type="button"
-                        className="site-button site-button--ghost"
-                        disabled={busy}
-                        onClick={() => {
-                          setSmsModalCode(regSmsCode);
-                          setSmsModalKind("register");
-                          setError(null);
-                        }}
-                      >
-                        {copy.smsCodeLabel}
-                      </button>
                       <label className="account-field">
                         {copy.birthdayLabel}
                         <div className="account-birthday-grid">
@@ -848,13 +786,178 @@ export default function AccountPage() {
               />
             </label>
             <div className="account-inline-actions">
-              <button type="button" className="site-button site-button--primary" onClick={handleApplySmsCode}>
+              <button
+                type="button"
+                className="site-button site-button--primary"
+                disabled={busy}
+                onClick={handleApplySmsCode}
+              >
                 {copy.verifyCodeBtn}
               </button>
               <button
                 type="button"
                 className="site-button site-button--ghost"
+                disabled={busy}
                 onClick={() => setSmsModalKind(null)}
+              >
+                {copy.closeBtn}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showForgot && (
+        <div className="account-code-popup" role="dialog" aria-modal="true" aria-labelledby="forgot-password-popup-title">
+          <div className="account-code-popup__card">
+            <h3 id="forgot-password-popup-title" className="account-code-popup__title">
+              {copy.forgotPassword}
+            </h3>
+            <p className="account-code-popup__text">{copy.forgotText}</p>
+            <label className="account-field">
+              {copy.phoneLabel}
+              <input
+                className="account-input"
+                type="tel"
+                inputMode="tel"
+                value={resetPhone}
+                onChange={(e) => setResetPhone(e.target.value)}
+                placeholder={copy.phonePlaceholder}
+              />
+            </label>
+            {error && <div className="account-message is-error">{error}</div>}
+            <div className="account-inline-actions">
+              <button
+                type="button"
+                className="site-button site-button--primary"
+                disabled={busy}
+                onClick={handleStartResetPassword}
+              >
+                {copy.resetPasswordBtn}
+              </button>
+              <button
+                type="button"
+                className="site-button site-button--ghost"
+                disabled={busy}
+                onClick={() => {
+                  setShowForgot(false);
+                  setError(null);
+                  setNotice(null);
+                }}
+              >
+                {copy.closeBtn}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {showResetPasswordPopup && (
+        <div className="account-code-popup" role="dialog" aria-modal="true" aria-labelledby="reset-password-popup-title">
+          <div className="account-code-popup__card">
+            <h3 id="reset-password-popup-title" className="account-code-popup__title">
+              {copy.resetPopupTitle}
+            </h3>
+            <p className="account-code-popup__text">{copy.resetPopupText}</p>
+            <label className="account-field">
+              {copy.newPasswordLabel}
+              <div className="account-password">
+                <input
+                  className="account-input"
+                  type={showResetPassword ? "text" : "password"}
+                  value={resetPassword}
+                  onChange={(e) => setResetPassword(e.target.value)}
+                  placeholder={copy.passwordPlaceholder}
+                />
+                <button
+                  type="button"
+                  className="account-password__toggle"
+                  aria-label={showResetPassword ? "Скрыть пароль" : "Показать пароль"}
+                  aria-pressed={showResetPassword}
+                  onClick={() => setShowResetPassword((prev) => !prev)}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.7" />
+                    {!showResetPassword && (
+                      <path
+                        d="M4 4l16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.7"
+                        strokeLinecap="round"
+                      />
+                    )}
+                  </svg>
+                </button>
+              </div>
+            </label>
+            <label className="account-field">
+              {copy.confirmPasswordLabel}
+              <div className="account-password">
+                <input
+                  className="account-input"
+                  type={showResetPasswordConfirm ? "text" : "password"}
+                  value={resetPasswordConfirm}
+                  onChange={(e) => setResetPasswordConfirm(e.target.value)}
+                  placeholder={copy.passwordPlaceholder}
+                />
+                <button
+                  type="button"
+                  className="account-password__toggle"
+                  aria-label={showResetPasswordConfirm ? "Скрыть пароль" : "Показать пароль"}
+                  aria-pressed={showResetPasswordConfirm}
+                  onClick={() => setShowResetPasswordConfirm((prev) => !prev)}
+                >
+                  <svg viewBox="0 0 24 24" aria-hidden="true">
+                    <path
+                      d="M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="1.7"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" strokeWidth="1.7" />
+                    {!showResetPasswordConfirm && (
+                      <path
+                        d="M4 4l16 16"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="1.7"
+                        strokeLinecap="round"
+                      />
+                    )}
+                  </svg>
+                </button>
+              </div>
+            </label>
+            {error && <div className="account-message is-error">{error}</div>}
+            <div className="account-inline-actions">
+              <button
+                type="button"
+                className="site-button site-button--primary"
+                disabled={busy}
+                onClick={handleResetPassword}
+              >
+                {copy.savePasswordBtn}
+              </button>
+              <button
+                type="button"
+                className="site-button site-button--ghost"
+                disabled={busy}
+                onClick={() => {
+                  setShowResetPasswordPopup(false);
+                  setResetPassword("");
+                  setResetPasswordConfirm("");
+                  setShowResetPassword(false);
+                  setShowResetPasswordConfirm(false);
+                }}
               >
                 {copy.closeBtn}
               </button>

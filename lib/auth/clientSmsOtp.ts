@@ -96,18 +96,8 @@ async function deleteRecord(purpose: SmsOtpPurpose, phoneNormalized: string) {
     .catch(() => null);
 }
 
-function buildSmsText(purpose: SmsOtpPurpose, code: string, locale: "ru" | "uz") {
-  // Keep SMS ASCII-only to avoid provider-side encoding issues.
-  if (locale === "uz") {
-    if (purpose === "register") {
-      return `Wasabi: registratsiya kodi ${code}. Kod 5 daqiqa amal qiladi.`;
-    }
-    return `Wasabi: parolni tiklash kodi ${code}. Kod 5 daqiqa amal qiladi.`;
-  }
-  if (purpose === "register") {
-    return `Wasabi: kod registratsii ${code}. Kod deystvuet 5 minut.`;
-  }
-  return `Wasabi: kod sbrosa parolya ${code}. Kod deystvuet 5 minut.`;
+function buildSmsText(code: string) {
+  return `Код подтверждения для сайта wasabisushi.uz: ${code}.`;
 }
 
 export async function sendClientSmsOtp(params: {
@@ -143,10 +133,9 @@ export async function sendClientSmsOtp(params: {
 
   await saveRecord(record);
 
-  const locale = params.locale === "uz" ? "uz" : "ru";
   const smsResult = await sendEskizSms({
     mobilePhone: phoneNormalized,
-    message: buildSmsText(params.purpose, code, locale),
+    message: buildSmsText(code),
   });
 
   if (!smsResult.ok) {
