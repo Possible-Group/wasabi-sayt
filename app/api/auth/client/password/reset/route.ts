@@ -3,7 +3,12 @@ import { z } from "zod";
 import { prisma } from "@/lib/db/prisma";
 import { verifyClientSmsOtp } from "@/lib/auth/clientSmsOtp";
 import { hashPassword } from "@/lib/auth/password";
-import { normalizePhone, getPosterClientById, normalizePosterClient } from "@/lib/poster/posterClients";
+import {
+  findPosterClientByPhone,
+  normalizePhone,
+  getPosterClientById,
+  normalizePosterClient,
+} from "@/lib/poster/posterClients";
 import { setClientSession } from "@/lib/auth/clientAuth";
 
 const Body = z.object({
@@ -61,8 +66,21 @@ export async function POST(req: Request) {
     data: { passwordHash },
   });
 
-  const freshPoster = await getPosterClientById(client.posterClientId);
+  let freshPoster = await findPosterClientByPhone(client.phone || phoneNormalized || body.phone);
+  if (!freshPoster) {
+    freshPoster = await getPosterClientById(client.posterClientId);
+  }
   const normalized = freshPoster ? normalizePosterClient(freshPoster) : null;
+
+  if (normalized && normalized.id !== client.posterClientId) {
+    await prisma.clientUser.update({
+      where: { id: client.id },
+      data: {
+        posterClientId: normalized.id,
+        phone: normalized.phone || client.phone,
+      },
+    });
+  }
 
   await setClientSession({
     clientId: normalized?.id || client.posterClientId,

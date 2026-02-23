@@ -215,7 +215,7 @@ export default function CartPage() {
                   ? "Menyudan taom tanlang va savatga qo'shing."
                   : "Выберите блюда из меню и добавьте в корзину."}
               </p>
-              <Link className="site-button site-button--primary" href={`/${locale}/menu`}>
+              <Link className="site-button site-button--primary" href={`/${locale}#products`}>
                 {locale === "uz" ? "Menyuga o'tish" : "Перейти к меню"}
               </Link>
             </div>

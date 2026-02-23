@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getClientSession } from "@/lib/auth/clientAuth";
-import { getPosterClientById, normalizePosterClient } from "@/lib/poster/posterClients";
+import { findPosterClientByPhone, normalizePosterClient } from "@/lib/poster/posterClients";
 
 export async function GET() {
   const session = await getClientSession();
@@ -8,7 +8,7 @@ export async function GET() {
     return NextResponse.json({ client: null });
   }
 
-  const fresh = await getPosterClientById(session.clientId);
+  const fresh = session.phone ? await findPosterClientByPhone(session.phone) : null;
   const normalized = fresh ? normalizePosterClient(fresh) : null;
 
   return NextResponse.json({

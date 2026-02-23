@@ -91,6 +91,7 @@ const COPY = {
     myLocationLoading: "Определяем...",
     myLocationError: "Не удалось определить местоположение.",
     myLocationDenied: "Разрешите доступ к геолокации.",
+    myLocationHttps: "Геолокация в Safari работает только на HTTPS или localhost.",
     pickupTitle: "Филиалы для самовывоза",
     pickupEmpty: "Филиалы не найдены.",
     paymentTitle: "Оплата",
@@ -155,6 +156,7 @@ const COPY = {
     myLocationLoading: "Aniqlanmoqda...",
     myLocationError: "Joylashuvni aniqlab bo'lmadi.",
     myLocationDenied: "Geolokatsiyaga ruxsat bering.",
+    myLocationHttps: "Safari'da geolokatsiya faqat HTTPS yoki localhost'da ishlaydi.",
     pickupTitle: "Olib ketish filiallari",
     pickupEmpty: "Filiallar topilmadi.",
     paymentTitle: "To'lov",
@@ -418,7 +420,6 @@ export default function CheckoutPage() {
   const markerRef = useRef<any>(null);
   const addressRequestId = useRef(0);
   const mapSearchRequestId = useRef(0);
-  const geoAutoAttempted = useRef(false);
   const [geoLoading, setGeoLoading] = useState(false);
   const [geoError, setGeoError] = useState("");
 
@@ -574,18 +575,6 @@ export default function CheckoutPage() {
     }
   }, [showMap]);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (deliveryType !== "delivery") return;
-    if (geoAutoAttempted.current) return;
-    if (!navigator.geolocation) return;
-    if (selectedLocationId || coords || address.trim()) return;
-    if (savedLocations.length > 0) return;
-
-    geoAutoAttempted.current = true;
-    useMyLocation();
-  }, [deliveryType, selectedLocationId, coords, address, savedLocations.length]);
-
   function createPlacemark(ymaps: any, lat: number, lng: number, center = false) {
     const pos: [number, number] = [lat, lng];
     const placemark = new ymaps.Placemark(pos, {}, { draggable: true });
@@ -710,6 +699,28 @@ export default function CheckoutPage() {
   }, [deliveryType, locale, showMap]);
 
   useEffect(() => {
+    if (deliveryType !== "delivery") return;
+    if (!showMap) return;
+    if (!coords) return;
+    if (mapStatus !== "ready") return;
+    if (typeof window === "undefined") return;
+    if (!window.ymaps || !mapInstance.current) return;
+
+    const ymaps = window.ymaps;
+    const pos: [number, number] = [coords.lat, coords.lng];
+    mapInstance.current.setCenter(pos, 16, { duration: 200 });
+
+    if (markerRef.current) {
+      markerRef.current.geometry.setCoordinates(pos);
+      return;
+    }
+
+    const placemark = createPlacemark(ymaps, coords.lat, coords.lng);
+    markerRef.current = placemark;
+    mapInstance.current.geoObjects.add(placemark);
+  }, [coords, deliveryType, mapStatus, showMap]);
+
+  useEffect(() => {
     if (!mapInstance.current) return;
     const onResize = () => {
       mapInstance.current?.container?.fitToViewport?.();
@@ -810,32 +821,155 @@ export default function CheckoutPage() {
     return "";
   }
 
-  function useMyLocation() {
+  function getBrowserGeoPositionByWatch(options: PositionOptions, timeoutMs = 25000) {
+    return new Promise<{ lat: number; lng: number }>((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error("GEO_NOT_SUPPORTED"));
+        return;
+      }
+      let done = false;
+      let watchId = -1;
+      const finish = (fn: () => void) => {
+        if (done) return;
+        done = true;
+        if (watchId >= 0) navigator.geolocation.clearWatch(watchId);
+        fn();
+      };
+      const timer = window.setTimeout(() => {
+        finish(() => reject(new Error("GEO_TIMEOUT")));
+      }, timeoutMs);
+
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          const lat = Number(pos.coords.latitude);
+          const lng = Number(pos.coords.longitude);
+          if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+            return;
+          }
+          window.clearTimeout(timer);
+          finish(() => resolve({ lat, lng }));
+        },
+        (err) => {
+          window.clearTimeout(timer);
+          finish(() => reject(err));
+        },
+        options
+      );
+    });
+  }
+
+  function isGeoDenied(error: unknown) {
+    return (
+      !!error &&
+      typeof error === "object" &&
+      "code" in error &&
+      Number((error as { code?: number }).code) === 1
+    );
+  }
+
+  function geoErrorSuffix(error: unknown) {
+    if (!error || typeof error !== "object" || !("code" in error)) return "";
+    const code = Number((error as { code?: number }).code);
+    if (!Number.isFinite(code)) return "";
+    return ` (geo:${code})`;
+  }
+
+  async function getYandexGeoPosition() {
+    try {
+      const lang = locale === "uz" ? "uz_UZ" : "ru_RU";
+      const ymaps = window.ymaps || (await loadYandexMaps(lang));
+      await new Promise<void>((resolve) => {
+        ymaps.ready(() => resolve());
+      });
+      const geo = await ymaps.geolocation.get({
+        provider: "auto",
+        autoReverseGeocode: false,
+        mapStateAutoApply: false,
+      });
+      const first = geo?.geoObjects?.get?.(0);
+      const pos = first?.geometry?.getCoordinates?.() as [number, number] | undefined;
+      if (!Array.isArray(pos) || pos.length < 2) return null;
+      const lat = Number(pos[0]);
+      const lng = Number(pos[1]);
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+      return { lat, lng };
+    } catch {
+      return null;
+    }
+  }
+
+  function useMyLocation(opts?: { openMap?: boolean }) {
     if (typeof window === "undefined") return;
+    const shouldOpenMap = opts?.openMap !== false;
+    const openMap = () => {
+      if (shouldOpenMap) setShowMap(true);
+    };
+    setGeoError("");
+    if (!window.isSecureContext) {
+      openMap();
+      setGeoError(copy.myLocationHttps);
+      return;
+    }
     if (!navigator.geolocation) {
+      openMap();
       setGeoError(copy.myLocationError);
       return;
     }
-    setGeoError("");
     setGeoLoading(true);
+    const applyPosition = (lat: number, lng: number) => {
+      setAddress(`${lat.toFixed(6)}, ${lng.toFixed(6)}`);
+      applyCoords(lat, lng, window.ymaps, { center: true });
+    };
+
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        const nextLat = Number(pos.coords.latitude);
-        const nextLng = Number(pos.coords.longitude);
-        const ymaps = window.ymaps;
-        applyCoords(nextLat, nextLng, ymaps, { center: true });
-        setGeoLoading(false);
-      },
-      (err) => {
-        if (err?.code === 1) {
-          setGeoError(copy.myLocationDenied);
-        } else {
+      (pos) => {
+        const lat = Number(pos.coords.latitude);
+        const lng = Number(pos.coords.longitude);
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
           setGeoError(copy.myLocationError);
+          setGeoLoading(false);
+          return;
         }
+        applyPosition(lat, lng);
         setGeoLoading(false);
       },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 60000 }
+      async (firstErr) => {
+        if (isGeoDenied(firstErr)) {
+          setGeoError(copy.myLocationDenied);
+          setGeoLoading(false);
+          return;
+        }
+
+        try {
+          const watch = await getBrowserGeoPositionByWatch(
+            { enableHighAccuracy: false, timeout: 25000, maximumAge: 300000 },
+            25000
+          );
+          applyPosition(watch.lat, watch.lng);
+          setGeoLoading(false);
+          return;
+        } catch (watchErr) {
+          if (isGeoDenied(watchErr)) {
+            setGeoError(copy.myLocationDenied);
+            setGeoLoading(false);
+            return;
+          }
+
+          const yPos = await getYandexGeoPosition();
+          if (yPos) {
+            applyPosition(yPos.lat, yPos.lng);
+            setGeoLoading(false);
+            return;
+          }
+
+          setGeoError(`${copy.myLocationError}${geoErrorSuffix(watchErr || firstErr)}`);
+          setGeoLoading(false);
+        }
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
+
+    openMap();
   }
 
   function selectSavedLocation(location: SavedLocation) {
@@ -1192,7 +1326,7 @@ export default function CheckoutPage() {
                   ? "Menyudan taom tanlang va savatga qo'shing."
                   : "Выберите блюда из меню и добавьте в корзину."}
               </p>
-              <Link className="site-button site-button--primary" href={`/${locale}/menu`}>
+              <Link className="site-button site-button--primary" href={`/${locale}#products`}>
                 {locale === "uz" ? "Menyuga o'tish" : "Перейти к меню"}
               </Link>
             </div>
@@ -1231,7 +1365,7 @@ export default function CheckoutPage() {
                       <button
                         type="button"
                         className="site-button site-button--ghost checkout-map-action"
-                        onClick={useMyLocation}
+                        onClick={() => useMyLocation()}
                         disabled={geoLoading}
                       >
                         {geoLoading ? copy.myLocationLoading : copy.myLocation}
@@ -1290,7 +1424,7 @@ export default function CheckoutPage() {
                         <button
                           type="button"
                           className="site-button site-button--ghost checkout-map-action"
-                          onClick={useMyLocation}
+                          onClick={() => useMyLocation()}
                           disabled={geoLoading}
                         >
                           {geoLoading ? copy.myLocationLoading : copy.myLocation}
@@ -1733,7 +1867,7 @@ export default function CheckoutPage() {
                 className="site-button site-button--primary"
                 onClick={() => {
                   setSuccessOpen(false);
-                  router.push(`/${locale}/menu`);
+                  router.push(`/${locale}#products`);
                 }}
               >
                 {copy.successCta}

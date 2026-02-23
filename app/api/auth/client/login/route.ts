@@ -44,10 +44,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "INVALID_CREDENTIALS" }, { status: 401 });
   }
 
-  let client = await getPosterClientById(localClient.posterClientId);
-  if (!client) {
-    client = await findPosterClientByPhone(phone);
-  }
+  const client = await findPosterClientByPhone(phoneNormalized || phone);
   if (!client) {
     return NextResponse.json({ error: "CLIENT_NOT_FOUND" }, { status: 404 });
   }
@@ -60,7 +57,10 @@ export async function POST(req: Request) {
   if (normalized.id !== localClient.posterClientId) {
     await prisma.clientUser.update({
       where: { id: localClient.id },
-      data: { posterClientId: normalized.id },
+      data: {
+        posterClientId: normalized.id,
+        phone: normalized.phone || phone,
+      },
     });
   }
 

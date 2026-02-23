@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db/prisma";
 import { rateLimit } from "@/lib/auth/rateLimit";
 import { isWithinWorkHours } from "@/lib/utils/timeWindow";
 import { getClientSession } from "@/lib/auth/clientAuth";
-import { getPosterClientById, normalizePosterClient } from "@/lib/poster/posterClients";
+import { findPosterClientByPhone, normalizePosterClient } from "@/lib/poster/posterClients";
 import { posterFetch } from "@/lib/poster/posterClient";
 import { cached } from "@/lib/poster/posterCache";
 import { sendEskizSms } from "@/lib/sms/eskiz";
@@ -225,7 +225,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "INVALID_PROMO" }, { status: 400 });
   }
 
-  const posterClient = await getPosterClientById(session.clientId);
+  const phoneLookup = String(session.phone ?? "").trim();
+  const posterClient = phoneLookup ? await findPosterClientByPhone(phoneLookup) : null;
   const normalizedClient = posterClient ? normalizePosterClient(posterClient) : null;
   const bonusAvailable = Number(normalizedClient?.bonus ?? 0) || 0;
 
@@ -242,9 +243,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "PHONE_REQUIRED" }, { status: 400 });
   }
 
-  const clientIdRaw = digitsOnly(session.clientId);
+  const clientIdRaw = digitsOnly(normalizedClient?.id || "");
   if (!clientIdRaw) {
-    return NextResponse.json({ error: "CLIENT_ID_INVALID" }, { status: 400 });
+    return NextResponse.json({ error: "CLIENT_NOT_FOUND" }, { status: 404 });
   }
 
   const packageItems = body.items.filter((it) => it.product_id === PACKAGE_ITEM_ID);
