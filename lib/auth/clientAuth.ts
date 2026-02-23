@@ -3,6 +3,8 @@ import type { NextRequest } from "next/server";
 import { cookies } from "next/headers";
 
 const COOKIE_NAME = process.env.CLIENT_COOKIE_NAME || "wasabi_client_session";
+const SESSION_TTL_SEC = 60 * 60 * 24 * 30;
+const COOKIE_DOMAIN = String(process.env.CLIENT_COOKIE_DOMAIN || "").trim();
 
 export type ClientTokenPayload = {
   sub: string;
@@ -34,6 +36,9 @@ export async function setClientCookie(token: string) {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
+    maxAge: SESSION_TTL_SEC,
+    expires: new Date(Date.now() + SESSION_TTL_SEC * 1000),
+    ...(COOKIE_DOMAIN ? { domain: COOKIE_DOMAIN } : {}),
   });
 }
 
@@ -44,6 +49,7 @@ export async function clearClientCookie() {
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     path: "/",
+    ...(COOKIE_DOMAIN ? { domain: COOKIE_DOMAIN } : {}),
     maxAge: 0,
   });
 }

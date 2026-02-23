@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getClientSession } from "@/lib/auth/clientAuth";
+import { getClientSession, setClientSession } from "@/lib/auth/clientAuth";
 import { findPosterClientByPhone, normalizePosterClient } from "@/lib/poster/posterClients";
 
 export async function GET() {
@@ -10,13 +10,22 @@ export async function GET() {
 
   const fresh = session.phone ? await findPosterClientByPhone(session.phone) : null;
   const normalized = fresh ? normalizePosterClient(fresh) : null;
-
-  return NextResponse.json({
-    client: normalized || {
+  const responseClient =
+    normalized || {
       id: session.clientId,
       name: session.name || "",
       phone: session.phone || "",
       bonus: 0,
-    },
+    };
+
+  // Sliding session: refresh cookie TTL on active usage.
+  await setClientSession({
+    clientId: responseClient.id,
+    phone: responseClient.phone || session.phone || "",
+    name: responseClient.name || session.name || "",
+  });
+
+  return NextResponse.json({
+    client: responseClient,
   });
 }
