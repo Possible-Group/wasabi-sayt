@@ -13,8 +13,33 @@ type ClientProfile = {
   bonus: number;
 };
 
-  const COPY = {
-    ru: {
+type AccountOrderItem = {
+  productId: string;
+  modificationId: string | null;
+  quantity: number;
+  totalMinor: number | null;
+  name: string;
+  nameUz: string | null;
+};
+
+type AccountOrder = {
+  id: string;
+  source: "incoming" | "transaction";
+  status: "new" | "accepted" | "cancelled" | "closed";
+  incomingOrderId: string | null;
+  transactionId: string | null;
+  serviceMode: number | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+  closedAt: string | null;
+  totalMinor: number | null;
+  paymentType: number | null;
+  discountPercent: number | null;
+  items: AccountOrderItem[];
+};
+
+const COPY = {
+  ru: {
     eyebrow: "Аккаунт",
     title: "Личный кабинет",
     subtitle: "Войдите или зарегистрируйтесь, чтобы копить бонусы.",
@@ -74,6 +99,32 @@ type ClientProfile = {
     passwordsMismatch: "Пароли не совпадают.",
     birthdayRequired: "Введите дату рождения для подтверждения.",
     birthdayMismatch: "Дата рождения не совпадает с данными в Poster.",
+    guestName: "Гость",
+    ordersTitle: "Мои заказы",
+    ordersText: "История онлайн-заказов и чеков из Poster.",
+    ordersLoading: "Загружаем историю заказов...",
+    ordersEmpty: "Заказов пока нет.",
+    ordersUnavailable: "Не удалось загрузить историю заказов.",
+    orderNumber: "Заказ",
+    receiptNumber: "Чек",
+    linkedReceipt: "Связанный чек",
+    orderCreatedAt: "Создан",
+    orderUpdatedAt: "Обновлён",
+    orderClosedAt: "Закрыт",
+    orderTotal: "Сумма",
+    orderPendingTotal: "Уточняется",
+    orderItems: "Состав",
+    serviceModeLabel: "Тип",
+    sourceIncoming: "Онлайн-заказ",
+    sourceTransaction: "Чек",
+    statusNew: "Новый",
+    statusAccepted: "Принят",
+    statusCancelled: "Отменён",
+    statusClosed: "Закрыт",
+    serviceModeHall: "В заведении",
+    serviceModePickup: "Самовывоз",
+    serviceModeDelivery: "Доставка",
+    itemFallback: "Товар",
   },
   uz: {
     eyebrow: "Profil",
@@ -135,6 +186,32 @@ type ClientProfile = {
     passwordsMismatch: "Parollar mos kelmadi.",
     birthdayRequired: "Tasdiqlash uchun tug'ilgan sanani kiriting.",
     birthdayMismatch: "Tug'ilgan sana Poster ma'lumotlariga mos kelmadi.",
+    guestName: "Mehmon",
+    ordersTitle: "Buyurtmalarim",
+    ordersText: "Poster'dagi onlayn buyurtmalar va chek tarixi.",
+    ordersLoading: "Buyurtmalar tarixi yuklanmoqda...",
+    ordersEmpty: "Hozircha buyurtmalar yo'q.",
+    ordersUnavailable: "Buyurtmalar tarixini yuklab bo'lmadi.",
+    orderNumber: "Buyurtma",
+    receiptNumber: "Chek",
+    linkedReceipt: "Bog'langan chek",
+    orderCreatedAt: "Yaratilgan",
+    orderUpdatedAt: "Yangilangan",
+    orderClosedAt: "Yopilgan",
+    orderTotal: "Summa",
+    orderPendingTotal: "Aniqlanmoqda",
+    orderItems: "Tarkibi",
+    serviceModeLabel: "Turi",
+    sourceIncoming: "Onlayn buyurtma",
+    sourceTransaction: "Chek",
+    statusNew: "Yangi",
+    statusAccepted: "Qabul qilingan",
+    statusCancelled: "Bekor qilingan",
+    statusClosed: "Yopilgan",
+    serviceModeHall: "Joyida",
+    serviceModePickup: "Olib ketish",
+    serviceModeDelivery: "Yetkazib berish",
+    itemFallback: "Tovar",
   },
 };
 
@@ -152,6 +229,36 @@ function sanitizeProfileName(value: string) {
   return normalized.replace(/^id\s*[:#-]?\s*\d+\s*/i, "").trim();
 }
 
+function formatMoneyMinor(value: number | null, locale: Locale, fallback: string) {
+  if (typeof value !== "number" || !Number.isFinite(value)) return fallback;
+  try {
+    const formatter = new Intl.NumberFormat(locale === "uz" ? "uz-UZ" : "ru-RU", {
+      maximumFractionDigits: 0,
+    });
+    return `${formatter.format(value / 100)} ${locale === "uz" ? "so'm" : "сум"}`;
+  } catch {
+    return fallback;
+  }
+}
+
+function formatDateTime(value: string | null, locale: Locale) {
+  if (!value) return "—";
+  const normalized = value.includes("T") ? value : value.replace(" ", "T");
+  const date = new Date(normalized);
+  if (!Number.isFinite(date.getTime())) return value;
+  try {
+    return new Intl.DateTimeFormat(locale === "uz" ? "uz-UZ" : "ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    }).format(date);
+  } catch {
+    return value;
+  }
+}
+
 export default function AccountPage() {
   const routeParams = useParams();
   const rawLocale = Array.isArray(routeParams?.locale)
@@ -166,6 +273,9 @@ export default function AccountPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [orders, setOrders] = useState<AccountOrder[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState<string | null>(null);
 
   const [mode, setMode] = useState<"login" | "register">("login");
   const [loginPhone, setLoginPhone] = useState("");
@@ -218,6 +328,43 @@ export default function AccountPage() {
   }, [loginPhone]);
 
   useEffect(() => {
+    if (!client) {
+      setOrders([]);
+      setOrdersLoading(false);
+      setOrdersError(null);
+      return;
+    }
+
+    let active = true;
+    setOrdersLoading(true);
+    setOrdersError(null);
+
+    fetch("/api/account/orders")
+      .then(async (response) => {
+        const data = await response.json().catch(() => null);
+        if (!response.ok) throw new Error(data?.error || "ORDER_HISTORY_UNAVAILABLE");
+        return Array.isArray(data?.orders) ? (data.orders as AccountOrder[]) : [];
+      })
+      .then((data) => {
+        if (!active) return;
+        setOrders(data);
+      })
+      .catch(() => {
+        if (!active) return;
+        setOrders([]);
+        setOrdersError(copy.ordersUnavailable);
+      })
+      .finally(() => {
+        if (!active) return;
+        setOrdersLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [client, copy.ordersUnavailable]);
+
+  useEffect(() => {
     if (!smsModalKind) return;
     const id = window.setTimeout(() => {
       smsModalInputRef.current?.focus();
@@ -253,6 +400,48 @@ export default function AccountPage() {
       setRegBirthDay("");
     }
   }, [birthdayDays, regBirthDay]);
+
+  function getOrderStatusText(status: AccountOrder["status"]) {
+    switch (status) {
+      case "accepted":
+        return copy.statusAccepted;
+      case "cancelled":
+        return copy.statusCancelled;
+      case "closed":
+        return copy.statusClosed;
+      default:
+        return copy.statusNew;
+    }
+  }
+
+  function getOrderSourceText(source: AccountOrder["source"]) {
+    return source === "transaction" ? copy.sourceTransaction : copy.sourceIncoming;
+  }
+
+  function getServiceModeText(serviceMode: number | null) {
+    if (serviceMode === 1) return copy.serviceModeHall;
+    if (serviceMode === 2) return copy.serviceModePickup;
+    if (serviceMode === 3) return copy.serviceModeDelivery;
+    return "—";
+  }
+
+  function getOrderHeading(order: AccountOrder) {
+    if (order.incomingOrderId) return `${copy.orderNumber} #${order.incomingOrderId}`;
+    if (order.transactionId) return `${copy.receiptNumber} #${order.transactionId}`;
+    return copy.ordersTitle;
+  }
+
+  function getOrderSubline(order: AccountOrder) {
+    if (order.closedAt) return `${copy.orderClosedAt}: ${formatDateTime(order.closedAt, locale)}`;
+    if (order.updatedAt) return `${copy.orderUpdatedAt}: ${formatDateTime(order.updatedAt, locale)}`;
+    if (order.createdAt) return `${copy.orderCreatedAt}: ${formatDateTime(order.createdAt, locale)}`;
+    return "—";
+  }
+
+  function getOrderItemName(item: AccountOrderItem) {
+    const localized = locale === "uz" ? item.nameUz : null;
+    return localized || item.name || `${copy.itemFallback} ${item.productId ? `#${item.productId}` : ""}`.trim();
+  }
 
   function getErrorText(errorCode?: string) {
     switch (errorCode) {
@@ -522,11 +711,14 @@ export default function AccountPage() {
             </div>
 
             {loading ? (
-              <div className="site-card account-card">{locale === "uz" ? "Yuklanmoqda..." : "Загрузка..."}</div>
+              <div className="site-card account-card">{copy.ordersLoading}</div>
             ) : client ? (
               <div className="account-grid">
                 <div className="site-card account-card account-profile">
-                  <div className="account-name">{profileName || (locale === "uz" ? "Mehmon" : "Гость")}</div>
+                  <div className="account-profile__eyebrow">
+                    <span className="account-pill">{copy.profileTitle}</span>
+                  </div>
+                  <div className="account-name">{profileName || copy.guestName}</div>
                   <div className="account-phone">{client.phone}</div>
                   <div className="account-bonus">
                     <span>{copy.bonusLabel}</span>
@@ -538,6 +730,97 @@ export default function AccountPage() {
                       {copy.logout}
                     </button>
                   </div>
+                </div>
+                <div className="site-card account-card account-orders">
+                  <div className="account-orders__head">
+                    <div>
+                      <div className="account-card__title">{copy.ordersTitle}</div>
+                      <div className="account-card__text">{copy.ordersText}</div>
+                    </div>
+                    {!ordersLoading && !ordersError ? (
+                      <div className="account-orders__count">{orders.length}</div>
+                    ) : null}
+                  </div>
+
+                  {ordersLoading ? (
+                    <div className="account-message">{copy.ordersLoading}</div>
+                  ) : ordersError ? (
+                    <div className="account-message is-error">{ordersError}</div>
+                  ) : orders.length ? (
+                    <div className="account-orders__list">
+                      {orders.map((order) => (
+                        <article key={order.id} className="account-order">
+                          <div className="account-order__top">
+                            <div>
+                              <div className="account-order__title">{getOrderHeading(order)}</div>
+                              <div className="account-order__sub">{getOrderSubline(order)}</div>
+                            </div>
+                            <div className="account-order__badges">
+                              <span className="account-order__badge">{getOrderSourceText(order.source)}</span>
+                              <span className={`account-order__badge is-${order.status}`}>
+                                {getOrderStatusText(order.status)}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="account-order__meta">
+                            <div className="account-order__meta-row">
+                              <span>{copy.orderTotal}</span>
+                              <strong>{formatMoneyMinor(order.totalMinor, locale, copy.orderPendingTotal)}</strong>
+                            </div>
+                            {order.createdAt ? (
+                              <div className="account-order__meta-row">
+                                <span>{copy.orderCreatedAt}</span>
+                                <strong>{formatDateTime(order.createdAt, locale)}</strong>
+                              </div>
+                            ) : null}
+                            {order.updatedAt && order.updatedAt !== order.createdAt ? (
+                              <div className="account-order__meta-row">
+                                <span>{copy.orderUpdatedAt}</span>
+                                <strong>{formatDateTime(order.updatedAt, locale)}</strong>
+                              </div>
+                            ) : null}
+                            {order.closedAt && order.closedAt !== order.updatedAt ? (
+                              <div className="account-order__meta-row">
+                                <span>{copy.orderClosedAt}</span>
+                                <strong>{formatDateTime(order.closedAt, locale)}</strong>
+                              </div>
+                            ) : null}
+                            {order.serviceMode ? (
+                              <div className="account-order__meta-row">
+                                <span>{copy.serviceModeLabel}</span>
+                                <strong>{getServiceModeText(order.serviceMode)}</strong>
+                              </div>
+                            ) : null}
+                            {order.transactionId && order.incomingOrderId ? (
+                              <div className="account-order__meta-row">
+                                <span>{copy.linkedReceipt}</span>
+                                <strong>#{order.transactionId}</strong>
+                              </div>
+                            ) : null}
+                          </div>
+
+                          <div className="account-order__items-wrap">
+                            <div className="account-order__items-title">{copy.orderItems}</div>
+                            {order.items.length ? (
+                              <ul className="account-order__items">
+                                {order.items.map((item, index) => (
+                                  <li key={`${order.id}:${item.productId}:${index}`} className="account-order__item">
+                                    <span className="account-order__item-name">{getOrderItemName(item)}</span>
+                                    <strong className="account-order__item-qty">x{item.quantity}</strong>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <div className="account-card__text">—</div>
+                            )}
+                          </div>
+                        </article>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="account-message">{copy.ordersEmpty}</div>
+                  )}
                 </div>
               </div>
             ) : (
