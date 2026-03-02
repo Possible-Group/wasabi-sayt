@@ -323,7 +323,7 @@ export async function POST(req: Request) {
       deliveryType === "delivery"
         ? { latitude: lat, longitude: lng }
         : { latitude: 0, longitude: 0 },
-    status: "bot",
+    status: "website",
     client_id: Number(clientIdRaw),
     pers_num: body.persons ?? 1,
     comment: commentText,
