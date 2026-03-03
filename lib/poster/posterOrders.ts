@@ -15,6 +15,8 @@ const TRANSACTIONS_PER_PAGE = Math.min(
 );
 const MAX_TRANSACTION_PAGES = parsePositiveInt(process.env.POSTER_ACCOUNT_ORDERS_MAX_PAGES, 20);
 const PRODUCTS_TTL = 60_000;
+const LOCAL_ORDER_MATCH_WINDOW_MS =
+  parsePositiveInt(process.env.POSTER_ACCOUNT_LOCAL_MATCH_WINDOW_MINUTES, 360) * 60 * 1000;
 
 type ProductCatalogEntry = {
   name: string;
@@ -59,6 +61,23 @@ type PosterTransaction = {
 type PosterTransactionResponse = {
   count?: string | number | null;
   data?: PosterTransaction[] | null;
+};
+
+type LocalOrderItem = {
+  product_id?: string | number | null;
+  name?: string | null;
+  price?: string | number | null;
+  qty?: string | number | null;
+};
+
+type LocalOrderRecord = {
+  id: number;
+  externalId: string | null;
+  deliveryType: string;
+  itemsJson: string;
+  total: number;
+  status: string;
+  createdAt: Date;
 };
 
 export type PosterAccountOrderItem = {
@@ -145,8 +164,24 @@ function mapIncomingStatus(status: unknown): PosterAccountOrder["status"] {
   return "new";
 }
 
+function mapLocalStatus(status: unknown): PosterAccountOrder["status"] {
+  const normalized = String(status ?? "")
+    .trim()
+    .toLowerCase();
+  if (normalized === "closed" || normalized === "done" || normalized === "completed") return "closed";
+  if (normalized === "cancelled" || normalized === "canceled") return "cancelled";
+  if (normalized === "accepted" || normalized === "confirmed" || normalized === "processing") return "accepted";
+  return "new";
+}
+
 function buildFallbackProductName(productId: string) {
   return productId ? `#${productId}` : "Item";
+}
+
+function getServiceModeFromDeliveryType(deliveryType: string) {
+  if (deliveryType === "delivery") return 3;
+  if (deliveryType === "pickup") return 2;
+  return null;
 }
 
 async function fetchProducts(categoryId?: string | null) {
@@ -286,6 +321,45 @@ async function fetchTransactions(dateFrom: string, dateTo: string) {
   return firstData.concat(...rest);
 }
 
+async function fetchLocalOrders(dateFrom: Date, normalizedPhone: string) {
+  if (!normalizedPhone) return [];
+
+  const orders = await prisma.order.findMany({
+    where: {
+      createdAt: {
+        gte: dateFrom,
+      },
+    },
+    orderBy: {
+      createdAt: "desc",
+    },
+    select: {
+      id: true,
+      externalId: true,
+      deliveryType: true,
+      itemsJson: true,
+      total: true,
+      status: true,
+      createdAt: true,
+      customerPhone: true,
+    },
+  });
+
+  return orders
+    .filter((order) => normalizePhone(order.customerPhone) === normalizedPhone)
+    .map(
+      (order): LocalOrderRecord => ({
+        id: order.id,
+        externalId: order.externalId,
+        deliveryType: order.deliveryType,
+        itemsJson: order.itemsJson,
+        total: order.total,
+        status: order.status,
+        createdAt: order.createdAt,
+      })
+    );
+}
+
 function buildItemFromIncoming(
   item: PosterIncomingOrderProduct,
   productCatalog: Map<string, ProductCatalogEntry>
@@ -318,6 +392,85 @@ function buildItemFromTransaction(
   };
 }
 
+function buildItemsFromLocalOrder(
+  itemsJson: string,
+  productCatalog: Map<string, ProductCatalogEntry>
+): PosterAccountOrderItem[] {
+  const parsed = JSON.parse(itemsJson) as unknown;
+  if (!Array.isArray(parsed)) return [];
+
+  return parsed.map((item) => {
+    const localItem = item as LocalOrderItem;
+    const productId = normalizeId(localItem?.product_id) || "";
+    const catalogEntry = productId ? productCatalog.get(productId) : null;
+    const quantity = Math.max(1, parseInteger(localItem?.qty, 1));
+    const unitPriceMinor = parseInteger(localItem?.price, 0);
+    const fallbackName = normalizeProductName(localItem?.name);
+
+    return {
+      productId,
+      modificationId: null,
+      quantity,
+      totalMinor: unitPriceMinor > 0 ? unitPriceMinor * quantity : null,
+      name: catalogEntry?.name || fallbackName || buildFallbackProductName(productId),
+      nameUz: catalogEntry?.nameUz || null,
+    };
+  });
+}
+
+function buildItemsSignature(items: PosterAccountOrderItem[]) {
+  return items
+    .map((item) => ({
+      productId: item.productId || "",
+      modificationId: item.modificationId || "",
+      quantity: item.quantity || 0,
+    }))
+    .sort((left, right) => {
+      if (left.productId !== right.productId) return left.productId.localeCompare(right.productId);
+      if (left.modificationId !== right.modificationId) return left.modificationId.localeCompare(right.modificationId);
+      return left.quantity - right.quantity;
+    })
+    .map((item) => `${item.productId}:${item.modificationId}:${item.quantity}`)
+    .join("|");
+}
+
+function parseOrderTimestamp(value: string | null) {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function isLocalOrderRepresentedByPoster(
+  localOrder: LocalOrderRecord,
+  localItems: PosterAccountOrderItem[],
+  posterOrder: PosterAccountOrder
+) {
+  const externalId = normalizeId(localOrder.externalId);
+  if (externalId && (posterOrder.incomingOrderId === externalId || posterOrder.transactionId === externalId)) {
+    return true;
+  }
+
+  const localTimestamp = localOrder.createdAt.getTime();
+  const posterTimestamp = parseOrderTimestamp(posterOrder.createdAt) ?? parseOrderTimestamp(posterOrder.updatedAt);
+  if (posterTimestamp === null) return false;
+  if (Math.abs(localTimestamp - posterTimestamp) > LOCAL_ORDER_MATCH_WINDOW_MS) return false;
+
+  const localServiceMode = getServiceModeFromDeliveryType(localOrder.deliveryType);
+  if (localServiceMode && posterOrder.serviceMode && localServiceMode !== posterOrder.serviceMode) return false;
+
+  if (posterOrder.totalMinor !== null && posterOrder.totalMinor !== localOrder.total) return false;
+
+  const localSignature = buildItemsSignature(localItems);
+  const posterSignature = buildItemsSignature(posterOrder.items);
+  if (localSignature && posterSignature) {
+    return localSignature === posterSignature;
+  }
+
+  if (posterOrder.totalMinor !== null) return posterOrder.totalMinor === localOrder.total;
+
+  return false;
+}
+
 function sortOrdersDesc(left: PosterAccountOrder, right: PosterAccountOrder) {
   const leftTime = Date.parse(left.closedAt || left.updatedAt || left.createdAt || "") || 0;
   const rightTime = Date.parse(right.closedAt || right.updatedAt || right.createdAt || "") || 0;
@@ -337,10 +490,11 @@ export async function getPosterAccountOrders({
 
   const dateTo = new Date();
   const dateFrom = new Date(dateTo.getTime() - HISTORY_DAYS * 24 * 60 * 60 * 1000);
-  const [incomingResult, transactionsResult, productCatalogResult] = await Promise.allSettled([
+  const [incomingResult, transactionsResult, productCatalogResult, localOrdersResult] = await Promise.allSettled([
     fetchIncomingOrders(formatPosterDateTime(dateFrom), formatPosterDateTime(dateTo)),
     fetchTransactions(formatPosterDate(dateFrom), formatPosterDate(dateTo)),
     getProductCatalog(),
+    fetchLocalOrders(dateFrom, normalizedPhone),
   ]);
 
   if (incomingResult.status === "rejected" && transactionsResult.status === "rejected") {
@@ -351,6 +505,7 @@ export async function getPosterAccountOrders({
   const transactions = transactionsResult.status === "fulfilled" ? transactionsResult.value : [];
   const productCatalog =
     productCatalogResult.status === "fulfilled" ? productCatalogResult.value : new Map<string, ProductCatalogEntry>();
+  const localOrders = localOrdersResult.status === "fulfilled" ? localOrdersResult.value : [];
 
   const filteredIncoming = incomingOrders.filter((order) => {
     const orderClientId = normalizeId(order?.client_id);
@@ -420,6 +575,36 @@ export async function getPosterAccountOrders({
       totalMinor: parseMoneyToMinor(transaction?.sum),
       paymentType: parseInteger(transaction?.pay_type, 0) || null,
       discountPercent: parseNumeric(transaction?.discount),
+      items,
+    });
+  }
+
+  for (const localOrder of localOrders) {
+    const externalId = normalizeId(localOrder.externalId);
+    let items: PosterAccountOrderItem[] = [];
+    try {
+      items = buildItemsFromLocalOrder(localOrder.itemsJson, productCatalog);
+    } catch {
+      items = [];
+    }
+
+    if (orders.some((posterOrder) => isLocalOrderRepresentedByPoster(localOrder, items, posterOrder))) {
+      continue;
+    }
+
+    orders.push({
+      id: `local:${localOrder.id}`,
+      source: "incoming",
+      status: mapLocalStatus(localOrder.status),
+      incomingOrderId: externalId || String(localOrder.id),
+      transactionId: null,
+      serviceMode: getServiceModeFromDeliveryType(localOrder.deliveryType),
+      createdAt: localOrder.createdAt.toISOString(),
+      updatedAt: localOrder.createdAt.toISOString(),
+      closedAt: null,
+      totalMinor: localOrder.total,
+      paymentType: null,
+      discountPercent: null,
       items,
     });
   }

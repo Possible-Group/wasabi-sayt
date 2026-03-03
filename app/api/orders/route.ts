@@ -7,7 +7,7 @@ import { getClientSession } from "@/lib/auth/clientAuth";
 import { findPosterClientByPhone, normalizePosterClient } from "@/lib/poster/posterClients";
 import { posterFetch } from "@/lib/poster/posterClient";
 import { cached } from "@/lib/poster/posterCache";
-import { sendEskizSms } from "@/lib/sms/eskiz";
+import { sendEskizSms, type SendEskizSmsResult } from "@/lib/sms/eskiz";
 
 const PACKAGE_ITEM_ID = "package_fee";
 const CHOPSTICKS_ITEM_ID = "chopsticks";
@@ -416,13 +416,13 @@ export async function POST(req: Request) {
     totalSum,
     deliveryType,
   });
-  const smsResult = await sendEskizSms({
+  const smsResult: SendEskizSmsResult = await sendEskizSms({
     mobilePhone: customerPhone,
     message: smsMessage,
     userSmsId: String(order.id),
   }).catch((error) => {
     const detail = error instanceof Error ? error.message : String(error);
-    return { ok: false, error: detail };
+    return { ok: false, error: detail } satisfies SendEskizSmsResult;
   });
   if (!smsResult.ok && !smsResult.skipped) {
     console.error("Eskiz SMS error:", smsResult.error || "UNKNOWN");

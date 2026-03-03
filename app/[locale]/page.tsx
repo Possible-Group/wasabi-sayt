@@ -362,12 +362,12 @@ export default async function HomePage({
   searchParams,
 }: {
   params: Promise<{ locale: string }>;
-  searchParams?: Promise<{ q?: string }> | { q?: string };
+  searchParams?: Promise<{ q?: string }>;
 }) {
   const p = await params;
   const locale: Locale = isLocale(p.locale) ? p.locale : "ru";
   const copy = COPY[locale];
-  const sp = searchParams ? await Promise.resolve(searchParams) : {};
+  const sp = searchParams ? await searchParams : {};
   const query = (sp?.q ?? "").trim().toLowerCase();
 
   const origin = await getCanonicalOrigin();       // ✅ fixed
@@ -535,7 +535,11 @@ export default async function HomePage({
         .sort((a, b) => {
           const aHas = a.sortOrder !== null && a.sortOrder !== undefined;
           const bHas = b.sortOrder !== null && b.sortOrder !== undefined;
-          if (aHas && bHas) return a.sortOrder - b.sortOrder || a.index - b.index;
+          if (aHas && bHas) {
+            const aSortOrder = a.sortOrder ?? 0;
+            const bSortOrder = b.sortOrder ?? 0;
+            return aSortOrder - bSortOrder || a.index - b.index;
+          }
           if (aHas) return -1;
           if (bHas) return 1;
           return a.index - b.index;

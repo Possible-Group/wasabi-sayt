@@ -40,7 +40,9 @@ async function getOffCategoryIds(): Promise<Set<string>> {
 
 async function fetchProducts(category_id?: string | null) {
   const key = `poster:products:${category_id || "all"}`;
-  return cached(key, PRODUCTS_TTL, () => posterFetch<any>("menu.getProducts", { category_id }));
+  return cached(key, PRODUCTS_TTL, () =>
+    posterFetch<any>("menu.getProducts", { category_id: category_id ?? undefined })
+  );
 }
 
 export async function GET(req: Request) {
