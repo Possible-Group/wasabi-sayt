@@ -25,6 +25,9 @@ const Body = z.object({
   customerPhone: z.string().optional(),
   customerName: z.string().optional(),
   deliveryType: z.enum(["delivery", "pickup"]),
+  deliveryTimeMode: z.enum(["today", "other"]).optional(),
+  deliveryDate: z.string().optional(),
+  deliveryClock: z.string().optional(),
   address: z.string().optional(),
   lat: z.number().optional(),
   lng: z.number().optional(),
@@ -41,6 +44,27 @@ const Body = z.object({
 function parseIntSetting(v: string | undefined, def: number) {
   const n = Number(v);
   return Number.isFinite(n) ? n : def;
+}
+
+function isIsoDate(value: string) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function isClockTime(value: string) {
+  return /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+}
+
+function getDateInTimeZone(value: Date, timeZone = "Asia/Tashkent") {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(value);
+  const year = parts.find((p) => p.type === "year")?.value ?? "0000";
+  const month = parts.find((p) => p.type === "month")?.value ?? "01";
+  const day = parts.find((p) => p.type === "day")?.value ?? "01";
+  return `${year}-${month}-${day}`;
 }
 
 function normalizePromoCode(value: string) {
@@ -179,6 +203,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "INVALID_BODY" }, { status: 400 });
   }
   const body = parsed.data;
+  const deliveryType = body.deliveryType;
+  const deliveryTimeMode = body.deliveryTimeMode;
+  const deliveryDate = String(body.deliveryDate ?? "").trim();
+  const deliveryClock = String(body.deliveryClock ?? "").trim();
 
   const session = await getClientSession();
   if (!session) return NextResponse.json({ error: "UNAUTHORIZED" }, { status: 401 });
@@ -193,7 +221,13 @@ export async function POST(req: Request) {
   const workStart = map["work_start"] || "10:00";
   const workEnd = map["work_end"] || "23:00";
   const open = isWithinWorkHours(new Date(), workStart, workEnd);
-  if (!open) {
+  const hasScheduledFutureDelivery =
+    deliveryType === "delivery" &&
+    deliveryTimeMode === "other" &&
+    isIsoDate(deliveryDate) &&
+    isClockTime(deliveryClock) &&
+    deliveryDate > getDateInTimeZone(new Date());
+  if (!open && !hasScheduledFutureDelivery) {
     return NextResponse.json(
       { error: "CLOSED", workStart, workEnd },
       { status: 400 }
@@ -201,8 +235,6 @@ export async function POST(req: Request) {
   }
 
   const deliveryFee = parseIntSetting(map["delivery_fee"], 0);
-
-  const deliveryType = body.deliveryType;
   const address = String(body.address ?? "").trim();
   const lat = body.lat;
   const lng = body.lng;

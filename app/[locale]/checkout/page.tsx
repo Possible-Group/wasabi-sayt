@@ -1242,6 +1242,15 @@ export default function CheckoutPage() {
           customerPhone: phone.trim(),
           customerName: name.trim() || undefined,
           deliveryType,
+          deliveryTimeMode: deliveryType === "delivery" ? deliveryTimeMode : undefined,
+          deliveryDate:
+            deliveryType === "delivery" && deliveryTimeMode === "other"
+              ? deliveryDate || undefined
+              : undefined,
+          deliveryClock:
+            deliveryType === "delivery" && deliveryTimeMode === "other"
+              ? deliveryClock || undefined
+              : undefined,
           address: deliveryType === "delivery" ? address.trim() : undefined,
           lat: deliveryType === "delivery" ? coords?.lat : undefined,
           lng: deliveryType === "delivery" ? coords?.lng : undefined,
