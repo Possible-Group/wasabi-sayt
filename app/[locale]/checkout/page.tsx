@@ -123,6 +123,7 @@ const COPY = {
     confirmNo: "Нет",
     errAuth: "Авторизуйтесь, чтобы оформить заказ.",
     errLocation: "Укажите точку на карте.",
+    errLocationSelect: "Пожалуйста, выберите адрес доставки.",
     errSpot: "Выберите филиал.",
     errPromo: "Промокод недействителен.",
     errBonus: "Недостаточно бонусов.",
@@ -188,6 +189,7 @@ const COPY = {
     confirmNo: "Yo'q",
     errAuth: "Buyurtma uchun kirish kerak.",
     errLocation: "Xaritadan manzilni tanlang.",
+    errLocationSelect: "Iltimos, yetkazish manzilini tanlang.",
     errSpot: "Filialni tanlang.",
     errPromo: "Promokod noto'g'ri.",
     errBonus: "Bonus yetarli emas.",
@@ -1007,7 +1009,7 @@ export default function CheckoutPage() {
   }
 
   async function saveCurrentLocation() {
-    if (!coords) return;
+    if (!coords) return null;
     setSavingLocation(true);
     try {
       let addressValue = address.trim();
@@ -1053,9 +1055,36 @@ export default function CheckoutPage() {
       }
       setAddress(addressValue);
       setShowMap(false);
+      return nextId || null;
     } finally {
       setSavingLocation(false);
     }
+  }
+
+  async function ensureSelectedDeliveryLocation() {
+    if (deliveryType !== "delivery") return true;
+    if (!coords) return false;
+    if (!address.trim()) return false;
+
+    if (selectedLocationId && savedLocations.some((loc) => loc.id === selectedLocationId)) {
+      return true;
+    }
+
+    const sameCoords = savedLocations.find(
+      (loc) =>
+        Math.abs(loc.lat - coords.lat) < 0.00001 &&
+        Math.abs(loc.lng - coords.lng) < 0.00001
+    );
+    if (sameCoords) {
+      setSelectedLocationId(sameCoords.id);
+      if (sameCoords.address !== address.trim()) {
+        await saveCurrentLocation();
+      }
+      return true;
+    }
+
+    const savedId = await saveCurrentLocation();
+    return Boolean(savedId);
   }
 
   function removeSavedLocation(id: string) {
@@ -1195,17 +1224,16 @@ export default function CheckoutPage() {
   }, [deliveryDate, deliveryTimeOpen, minOtherDeliveryDate]);
 
   function buildOrderComment() {
-    const base = comment.trim();
-    if (deliveryType !== "delivery") return base || undefined;
-    const note =
-      deliveryTimeMode === "other"
-        ? hasCustomDeliveryTime
-          ? `${copy.deliveryTimeNote} ${deliveryTimeLabel}`
-          : ""
-        : `${copy.deliveryTimeNote} ${deliveryTimeLabel}`;
-    if (!note) return base || undefined;
-    if (!base) return note;
-    return `${base}\n${note}`;
+    const value = comment.trim();
+    return value || undefined;
+  }
+
+  function buildOrderServiceNote() {
+    if (deliveryType !== "delivery") return undefined;
+    if (deliveryTimeMode === "other") {
+      return hasCustomDeliveryTime ? `${copy.deliveryTimeNote} ${deliveryTimeLabel}` : undefined;
+    }
+    return `${copy.deliveryTimeNote} ${deliveryTimeLabel}`;
   }
 
   async function placeOrder() {
@@ -1223,8 +1251,10 @@ export default function CheckoutPage() {
     }
 
     if (deliveryType === "delivery") {
-      if (!coords) return setErr(copy.errLocation);
+      if (!coords) return setErr(copy.errLocationSelect);
       if (!address.trim()) return setErr(locale === "uz" ? "Manzil kiriting" : "Введите адрес");
+      const hasSelectedLocation = await ensureSelectedDeliveryLocation();
+      if (!hasSelectedLocation) return setErr(copy.errLocationSelect);
     } else if (!pickupSpotId) {
       return setErr(copy.errSpot);
     }
@@ -1259,6 +1289,7 @@ export default function CheckoutPage() {
           bonusAmount: bonusUsed || 0,
           promoCode: promoCode.trim() || undefined,
           comment: buildOrderComment(),
+          serviceNote: buildOrderServiceNote(),
           items: items.map((i) => ({
             product_id: i.product_id,
             name: i.name,
@@ -1297,9 +1328,6 @@ export default function CheckoutPage() {
       setPromoCode("");
       setComment("");
       setBonusInput("");
-      if (deliveryType === "delivery" && coords) {
-        await saveCurrentLocation();
-      }
       setSuccessOrderId(data?.orderId ? String(data.orderId) : null);
       setSuccessOpen(true);
     } finally {

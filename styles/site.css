@@ -2607,7 +2607,10 @@ textarea.checkout-input{
 }
 .account-order{
   display:grid;
+  grid-template-rows: auto auto 1fr;
+  align-content:start;
   gap: 14px;
+  height: 100%;
   padding: 16px;
   border-radius: 20px;
   border: 1px solid rgba(103,143,7,0.18);
@@ -2623,30 +2626,38 @@ textarea.checkout-input{
   border-color: rgba(103,143,7,0.28);
 }
 .account-order__top{
-  display:flex;
+  display:grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items:flex-start;
-  justify-content:space-between;
-  gap: 12px;
+  gap: 12px 16px;
+}
+.account-order__top > :first-child{
+  min-width: 0;
 }
 .account-order__title{
   font-size: 17px;
   font-weight: 800;
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+  overflow-wrap: anywhere;
 }
 .account-order__sub{
-  margin-top: 4px;
+  margin-top: 6px;
   font-size: 13px;
   color: var(--site-muted);
+  line-height: 1.35;
 }
 .account-order__badges{
-  display:flex;
-  flex-wrap:wrap;
-  justify-content:flex-end;
+  display:grid;
+  justify-items:end;
+  align-content:start;
   gap: 8px;
 }
 .account-order__badge{
   display:inline-flex;
   align-items:center;
   justify-content:center;
+  max-width: 100%;
   padding: 7px 11px;
   border-radius: 999px;
   background: rgba(103,143,7,0.12);
@@ -2670,14 +2681,18 @@ textarea.checkout-input{
 }
 .account-order__meta{
   display:grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  grid-auto-rows: 1fr;
   gap: 10px;
+  align-items:stretch;
 }
 .account-order__meta-row{
-  display:flex;
+  display:flex !important;
+  flex-direction:column;
   align-items:flex-start;
-  justify-content:space-between;
-  gap: 12px;
+  justify-content:flex-start;
+  gap: 8px;
+  min-width: 0;
   padding: 11px 12px;
   border-radius: 14px;
   background: rgba(255,250,221,0.72);
@@ -2685,10 +2700,22 @@ textarea.checkout-input{
   font-size: 13px;
 }
 .account-order__meta-row span{
+  display:block;
+  max-width: 100%;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  line-height: 1.2;
+  text-transform: uppercase;
   color: var(--site-muted);
 }
 .account-order__meta-row strong{
-  text-align:right;
+  display:block;
+  width: 100%;
+  min-width: 0;
+  margin-top: auto;
+  text-align: left;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
 }
 .account-order__items-wrap{
   display:grid;
@@ -2812,9 +2839,6 @@ textarea.checkout-input{
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 16px;
   }
-  .account-order:first-child{
-    grid-column: 1 / -1;
-  }
   .account-order{
     padding: 18px 18px 16px;
     border-radius: 24px;
@@ -2831,11 +2855,8 @@ textarea.checkout-input{
   .account-order__meta{
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .account-order:first-child .account-order__meta{
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
   .account-order__meta-row{
-    min-height: 72px;
+    min-height: 96px;
     padding: 13px 14px;
   }
   .account-order__meta-row strong{
@@ -3220,10 +3241,18 @@ textarea.checkout-input{
     gap: 10px;
     border-radius: 18px;
   }
-  .account-order__top{ flex-direction: column; gap: 8px; }
+  .account-order__top{
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
   .account-order__title{ font-size: 16px; }
   .account-order__sub{ margin-top: 3px; font-size: 12px; }
-  .account-order__badges{ justify-content: flex-start; gap: 6px; }
+  .account-order__badges{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:flex-start;
+    gap: 6px;
+  }
   .account-order__badge{
     padding: 6px 9px;
     font-size: 11px;
@@ -3235,8 +3264,6 @@ textarea.checkout-input{
   .account-order__meta-row{
     min-height: 0;
     padding: 9px 10px;
-    flex-direction: column;
-    align-items: flex-start;
     gap: 4px;
     border-radius: 12px;
   }
@@ -3246,7 +3273,6 @@ textarea.checkout-input{
     text-transform: uppercase;
   }
   .account-order__meta-row strong{
-    text-align: left;
     font-size: 13px;
     line-height: 1.25;
   }

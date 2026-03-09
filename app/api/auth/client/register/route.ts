@@ -82,7 +82,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "INVALID_BODY" }, { status: 400 });
   }
   const body = parsed.data;
-  const birthday = body.birthday?.trim() || undefined;
   const normalizedBirthday = normalizeBirthday(body.birthday);
   const phone = body.phone.trim();
   const phoneNormalized = normalizePhone(phone);
@@ -131,7 +130,7 @@ export async function POST(req: Request) {
   let createError: string | null = null;
   if (!client) {
     try {
-      client = await createPosterClient({ name: body.name, phone, birthday });
+      client = await createPosterClient({ name: body.name, phone, birthday: normalizedBirthday || undefined });
       created = Boolean(client);
       posterWasExisting = false;
     } catch (error) {

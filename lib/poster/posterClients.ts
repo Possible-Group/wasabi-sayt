@@ -224,8 +224,9 @@ export async function createPosterClient({
   if (!clientName || !clientPhone) return null;
   const normalizedPhone = normalizePhone(clientPhone);
   const plusNormalized = normalizedPhone ? `+${normalizedPhone}` : "";
-  const birthdayAlt = formatBirthdayAlt(birthday);
-  const birthdayDash = formatBirthdayDash(birthday);
+  const normalizedBirthday = String(birthday || "").trim() || undefined;
+  const birthdayAlt = formatBirthdayAlt(normalizedBirthday);
+  const birthdayDash = formatBirthdayDash(normalizedBirthday);
   const nameParts = clientName.split(/\s+/).filter(Boolean);
   const firstName = nameParts[0] || "";
   const lastName = nameParts.slice(1).join(" ") || "";
@@ -243,7 +244,7 @@ export async function createPosterClient({
   };
 
   const phoneVariants = [clientPhone, normalizedPhone, plusNormalized].filter(Boolean);
-  const birthdayVariants = [birthday, birthdayAlt, birthdayDash].filter(Boolean);
+  const birthdayVariants = [normalizedBirthday, birthdayAlt, birthdayDash].filter(Boolean);
   const payloads: Array<Record<string, string | undefined>> = [];
 
   for (const phoneValue of phoneVariants) {
@@ -275,6 +276,7 @@ export async function createPosterClient({
       phone_number: phoneValue,
       client_groups_id_client: groupId,
       email: emailValue,
+      birthday: normalizedBirthday,
     });
     if (firstName) {
       payloads.push({
@@ -286,6 +288,7 @@ export async function createPosterClient({
         phone_number: phoneValue,
         client_groups_id_client: groupId,
         email: emailValue,
+        birthday: normalizedBirthday,
       });
     }
   }

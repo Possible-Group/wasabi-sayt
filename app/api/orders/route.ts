@@ -35,6 +35,7 @@ const Body = z.object({
   persons: z.number().int().positive().optional(),
   promoCode: z.string().optional(),
   comment: z.string().optional(),
+  serviceNote: z.string().optional(),
   paymentMethod: z.enum(["cash", "card"]),
   bonusAmount: z.number().nonnegative().optional(),
   items: z.array(Item).min(1),
@@ -160,10 +161,11 @@ function escapeTelegram(text: string) {
   });
 }
 
-function appendExtraComment(base: string, extra: string) {
-  const trimmed = base.trim();
-  if (!extra) return trimmed;
-  return trimmed ? `${trimmed}\n${extra}` : extra;
+function joinOrderNotes(...parts: string[]) {
+  return parts
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join("\n");
 }
 
 function buildOrderSmsText(params: {
@@ -337,8 +339,9 @@ export async function POST(req: Request) {
     };
   });
 
-  const commentText = appendExtraComment(
-    String(body.comment ?? ""),
+  const customerComment = String(body.comment ?? "").trim();
+  const serviceComment = joinOrderNotes(
+    String(body.serviceNote ?? ""),
     chopsticksIncluded ? "" : "Без палочек"
   );
 
@@ -358,7 +361,7 @@ export async function POST(req: Request) {
     status: "website",
     client_id: Number(clientIdRaw),
     pers_num: body.persons ?? 1,
-    comment: commentText,
+    comment: customerComment || undefined,
     address: deliveryType === "delivery" ? address : "",
     promocode: promoCodeInput || "",
     promocode_id: promo?.promotionId ?? 0,
@@ -424,7 +427,12 @@ export async function POST(req: Request) {
       : "Филиал: —";
   const promoLine = promoCodeInput ? `Промокод: ${promoCodeInput}` : "Промокод: —";
   const bonusLine = bonusCapped > 0 ? `Бонусы: ${formatMoney(bonusCapped)}` : "Бонусы: —";
-  const commentLine = commentText ? `Комментарий: ${escapeTelegram(commentText)}` : "Комментарий: —";
+  const commentLine = customerComment
+    ? `Комментарий клиента: ${escapeTelegram(customerComment)}`
+    : "Комментарий клиента: —";
+  const serviceCommentLine = serviceComment
+    ? `Служебная пометка: ${escapeTelegram(serviceComment)}`
+    : null;
 
   const telegramMessage = [
     `🍣 ${header}`,
@@ -438,7 +446,10 @@ export async function POST(req: Request) {
     "Товары:",
     productDetails,
     commentLine,
-  ].join("\n");
+    serviceCommentLine,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   await sendTelegramNotification(telegramMessage);
 
