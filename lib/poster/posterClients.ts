@@ -246,16 +246,9 @@ export async function createPosterClient({
   const phoneVariants = [clientPhone, normalizedPhone, plusNormalized].filter(Boolean);
   const birthdayVariants = [normalizedBirthday, birthdayAlt, birthdayDash].filter(Boolean);
   const payloads: Array<Record<string, string | undefined>> = [];
+  const fallbackPayloads: Array<Record<string, string | undefined>> = [];
 
   for (const phoneValue of phoneVariants) {
-    payloads.push({
-      client_name: clientName,
-      phone: phoneValue,
-      client_phone: phoneValue,
-      phone_number: phoneValue,
-      client_groups_id_client: groupId,
-      email: emailValue,
-    });
     for (const birth of birthdayVariants) {
       payloads.push({
         client_name: clientName,
@@ -269,17 +262,51 @@ export async function createPosterClient({
         birth_date: birth,
       });
     }
-    payloads.push({
-      name: clientName,
+    if (normalizedBirthday) {
+      payloads.push({
+        name: clientName,
+        phone: phoneValue,
+        client_phone: phoneValue,
+        phone_number: phoneValue,
+        client_groups_id_client: groupId,
+        email: emailValue,
+        birthday: normalizedBirthday,
+      });
+      if (firstName) {
+        payloads.push({
+          first_name: firstName,
+          last_name: lastName || undefined,
+          client_name: clientName,
+          phone: phoneValue,
+          client_phone: phoneValue,
+          phone_number: phoneValue,
+          client_groups_id_client: groupId,
+          email: emailValue,
+          birthday: normalizedBirthday,
+        });
+      }
+    }
+
+    fallbackPayloads.push({
+      client_name: clientName,
       phone: phoneValue,
       client_phone: phoneValue,
       phone_number: phoneValue,
       client_groups_id_client: groupId,
       email: emailValue,
-      birthday: normalizedBirthday,
     });
-    if (firstName) {
-      payloads.push({
+    if (!normalizedBirthday) {
+      fallbackPayloads.push({
+        name: clientName,
+        phone: phoneValue,
+        client_phone: phoneValue,
+        phone_number: phoneValue,
+        client_groups_id_client: groupId,
+        email: emailValue,
+      });
+    }
+    if (firstName && !normalizedBirthday) {
+      fallbackPayloads.push({
         first_name: firstName,
         last_name: lastName || undefined,
         client_name: clientName,
@@ -288,10 +315,32 @@ export async function createPosterClient({
         phone_number: phoneValue,
         client_groups_id_client: groupId,
         email: emailValue,
-        birthday: normalizedBirthday,
+      });
+    }
+    if (firstName && normalizedBirthday) {
+      fallbackPayloads.push({
+        first_name: firstName,
+        last_name: lastName || undefined,
+        client_name: clientName,
+        phone: phoneValue,
+        client_phone: phoneValue,
+        phone_number: phoneValue,
+        client_groups_id_client: groupId,
+        email: emailValue,
+      });
+    } else if (!firstName && normalizedBirthday) {
+      fallbackPayloads.push({
+        name: clientName,
+        phone: phoneValue,
+        client_phone: phoneValue,
+        phone_number: phoneValue,
+        client_groups_id_client: groupId,
+        email: emailValue,
       });
     }
   }
+
+  payloads.push(...fallbackPayloads);
 
   const methods = [
     "clients.createClient",
