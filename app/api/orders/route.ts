@@ -11,6 +11,7 @@ import { sendEskizSms, type SendEskizSmsResult } from "@/lib/sms/eskiz";
 
 const PACKAGE_ITEM_ID = "package_fee";
 const CHOPSTICKS_ITEM_ID = "chopsticks";
+const PaymentMethodSchema = z.enum(["cash", "click", "payme"]);
 
 const Item = z.object({
   product_id: z.string(),
@@ -21,26 +22,37 @@ const Item = z.object({
   photo: z.string().optional(),
 });
 
-const Body = z.object({
-  customerPhone: z.string().optional(),
-  customerName: z.string().optional(),
-  deliveryType: z.enum(["delivery", "pickup"]),
-  deliveryTimeMode: z.enum(["today", "other"]).optional(),
-  deliveryDate: z.string().optional(),
-  deliveryClock: z.string().optional(),
-  address: z.string().optional(),
-  lat: z.number().optional(),
-  lng: z.number().optional(),
-  spotId: z.string().optional(),
-  persons: z.number().int().positive().optional(),
-  promoCode: z.string().optional(),
-  comment: z.string().optional(),
-  serviceNote: z.string().optional(),
-  paymentMethod: z.enum(["cash", "card"]),
-  bonusAmount: z.number().nonnegative().optional(),
-  items: z.array(Item).min(1),
-  utm: z.record(z.string()).optional(),
-});
+const Body = z
+  .object({
+    customerPhone: z.string().optional(),
+    customerName: z.string().optional(),
+    deliveryType: z.enum(["delivery", "pickup"]),
+    deliveryTimeMode: z.enum(["today", "other"]).optional(),
+    deliveryDate: z.string().optional(),
+    deliveryClock: z.string().optional(),
+    address: z.string().optional(),
+    lat: z.number().optional(),
+    lng: z.number().optional(),
+    spotId: z.string().optional(),
+    persons: z.number().int().positive().optional(),
+    promoCode: z.string().optional(),
+    comment: z.string().optional(),
+    serviceNote: z.string().optional(),
+    payment: PaymentMethodSchema.optional(),
+    paymentMethod: PaymentMethodSchema.optional(),
+    bonusAmount: z.number().nonnegative().optional(),
+    items: z.array(Item).min(1),
+    utm: z.record(z.string()).optional(),
+  })
+  .superRefine((body, ctx) => {
+    if (!body.payment && !body.paymentMethod) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "payment is required",
+        path: ["payment"],
+      });
+    }
+  });
 
 function parseIntSetting(v: string | undefined, def: number) {
   const n = Number(v);
@@ -92,6 +104,12 @@ type PromoInfo = {
   promotionId: number | null;
   discountValue: number;
   resultType: number;
+};
+
+type PosterSpot = {
+  spot_id?: string | number;
+  name?: string;
+  spot_name?: string;
 };
 
 async function getPosterPromoByCode(code: string): Promise<PromoInfo | null> {
@@ -148,9 +166,64 @@ function formatMoney(sum: number) {
 }
 
 function paymentLabel(method: string) {
+  if (method === "click") return "Click";
+  if (method === "payme") return "Payme";
   if (method === "card") return "Карта";
   if (method === "cash") return "Наличными";
   return method || "—";
+}
+
+function getPosterPaymentMethod(method: string) {
+  if (method === "click" || method === "payme") return "card";
+  return method;
+}
+
+function getOrderApiPaymentMethodLabel(method: string) {
+  if (method === "cash") return "Наличными";
+  if (method === "click") return "Click";
+  if (method === "payme") return "Payme";
+  return "Карта";
+}
+
+function getPaymentBreakdown(total: number, method: string) {
+  if (method === "cash") {
+    return {
+      pay_cash: total,
+      pay_card: 0,
+      pay_sertificate: 0,
+      pay_bonus: 0,
+      pay_payme: 0,
+      pay_click: 0,
+    };
+  }
+  if (method === "click") {
+    return {
+      pay_cash: 0,
+      pay_card: 0,
+      pay_sertificate: 0,
+      pay_bonus: 0,
+      pay_payme: 0,
+      pay_click: total,
+    };
+  }
+  if (method === "payme") {
+    return {
+      pay_cash: 0,
+      pay_card: 0,
+      pay_sertificate: 0,
+      pay_bonus: 0,
+      pay_payme: total,
+      pay_click: 0,
+    };
+  }
+  return {
+    pay_cash: 0,
+    pay_card: total,
+    pay_sertificate: 0,
+    pay_bonus: 0,
+    pay_payme: 0,
+    pay_click: 0,
+  };
 }
 
 function escapeTelegram(text: string) {
@@ -205,6 +278,8 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "INVALID_BODY" }, { status: 400 });
   }
   const body = parsed.data;
+  const paymentMethod = body.payment ?? body.paymentMethod ?? "cash";
+  const orderApiPaymentMethod = getOrderApiPaymentMethodLabel(paymentMethod);
   const deliveryType = body.deliveryType;
   const deliveryTimeMode = body.deliveryTimeMode;
   const deliveryDate = String(body.deliveryDate ?? "").trim();
@@ -319,6 +394,9 @@ export async function POST(req: Request) {
 
   const serviceMode = deliveryType === "delivery" ? 3 : 2;
   const spotId = digitsOnly(spotIdRaw);
+  const deliveryLabel = deliveryType === "delivery" ? "Доставка" : "Навынос";
+  const serviceOption = { name: deliveryLabel, service_mode: serviceMode };
+  const paymentBreakdown = getPaymentBreakdown(totalSum, paymentMethod);
 
   const productsPayload = regularItems.map((it) => {
     const idRaw = digitsOnly(it.product_id);
@@ -329,41 +407,66 @@ export async function POST(req: Request) {
       product_id: Number.isFinite(idNum) ? idNum : 0,
       product_name: it.name,
       count: it.qty,
+      modifications: [],
       price: priceSum,
       discounted_price: discountedSum,
       promotion_id: promo?.promotionId ?? null,
       discount_value: promo?.discountValue ?? 0,
       result_type: promo?.resultType ?? 0,
       menu_category_id: it.menu_category_id ?? undefined,
-      photo_origin: it.photo ?? undefined,
+      category_name: "",
+      photo: it.photo ?? undefined,
     };
   });
 
   const customerComment = String(body.comment ?? "").trim();
+  const orderComment = customerComment || undefined;
   const serviceComment = joinOrderNotes(
     String(body.serviceNote ?? ""),
     chopsticksIncluded ? "" : "Без палочек"
   );
+  const posterPaymentMethod = getPosterPaymentMethod(paymentMethod);
+  const posterSpots = spotId
+    ? await cached("poster:spots", 60_000, () => posterFetch<{ response?: PosterSpot[] }>("spots.getSpots"))
+    : null;
+  const spotName = spotId
+    ? (Array.isArray(posterSpots?.response) ? posterSpots.response : []).find(
+        (spot) => digitsOnly(String(spot?.spot_id ?? "")) === spotId
+      )?.name ||
+      ""
+    : "";
 
   const orderPayload = {
     service_mode: serviceMode,
     spot_id: spotId ? Number(spotId) : 0,
-    payment_method: body.paymentMethod,
-    bonus: bonusCapped,
+    phone: customerPhone,
     products: productsPayload,
+    payment_method: orderApiPaymentMethod,
     total: totalSum,
     chat_id: 0,
-    phone: customerPhone,
     location:
       deliveryType === "delivery"
         ? { latitude: lat, longitude: lng }
         : { latitude: 0, longitude: 0 },
     status: "website",
     client_id: Number(clientIdRaw),
-    pers_num: body.persons ?? 1,
-    comment: customerComment || undefined,
+    delivery_price: deliveryType === "delivery" ? deliveryFee : 0,
+    transaction_id: 0,
+    incoming_order_id: 0,
+    deliver_name: "",
     address: deliveryType === "delivery" ? address : "",
+    client_name: customerName || "",
+    spot_name: spotName,
+    comment: orderComment || undefined,
+    pers_num: body.persons ?? 1,
+    bonus: bonusCapped,
+    delivery_time: 60,
+    discount_price: promoDiscountSum,
+    serviceOption,
+    ...paymentBreakdown,
+    client_address_id: 0,
     promocode: promoCodeInput || "",
+    payment: posterPaymentMethod,
     promocode_id: promo?.promotionId ?? 0,
   };
 
@@ -417,7 +520,6 @@ export async function POST(req: Request) {
   const productDetails = productsPayload.length
     ? productsPayload.map((p) => `• ${escapeTelegram(p.product_name)} — ${p.count} шт.`).join("\n")
     : "—";
-  const deliveryLabel = deliveryType === "delivery" ? "Доставка" : "Навынос";
   const header = apiJson?.order_id ? `Заказ #${apiJson.order_id}` : `Заказ #${order.id}`;
   const addressLine =
     deliveryType === "delivery"
@@ -439,7 +541,7 @@ export async function POST(req: Request) {
     `Тип: ${deliveryLabel}`,
     `Телефон: ${escapeTelegram(customerPhone)}`,
     addressLine,
-    `Оплата: ${paymentLabel(body.paymentMethod)}`,
+    `Оплата: ${paymentLabel(paymentMethod)}`,
     `Сумма: ${formatMoney(totalSum)}`,
     bonusLine,
     promoLine,

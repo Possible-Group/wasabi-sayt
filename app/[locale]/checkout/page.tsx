@@ -67,6 +67,8 @@ type GeoSearchResult = {
   lng: number;
 };
 
+type PaymentMethod = "cash" | "click" | "payme";
+
 const COPY = {
   ru: {
     loginTitle: "Войдите в аккаунт",
@@ -96,7 +98,8 @@ const COPY = {
     pickupEmpty: "Филиалы не найдены.",
     paymentTitle: "Оплата",
     paymentCash: "Наличными",
-    paymentCard: "Картой",
+    paymentClick: "Click",
+    paymentPayme: "Payme",
     bonusTitle: "Бонусы",
     bonusAvailable: "Доступно бонусов",
     bonusUse: "Списать бонусы",
@@ -162,7 +165,8 @@ const COPY = {
     pickupEmpty: "Filiallar topilmadi.",
     paymentTitle: "To'lov",
     paymentCash: "Naqd",
-    paymentCard: "Karta",
+    paymentClick: "Click",
+    paymentPayme: "Payme",
     bonusTitle: "Bonuslar",
     bonusAvailable: "Mavjud bonuslar",
     bonusUse: "Bonusdan foydalanish",
@@ -403,7 +407,7 @@ export default function CheckoutPage() {
   const [address, setAddress] = useState("");
   const [promoCode, setPromoCode] = useState("");
   const [comment, setComment] = useState("");
-  const [paymentMethod, setPaymentMethod] = useState<"cash" | "card">("card");
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("click");
   const [bonusInput, setBonusInput] = useState("");
 
   const [locations, setLocations] = useState<AboutLocation[]>([]);
@@ -1285,6 +1289,7 @@ export default function CheckoutPage() {
           lat: deliveryType === "delivery" ? coords?.lat : undefined,
           lng: deliveryType === "delivery" ? coords?.lng : undefined,
           spotId: deliveryType === "pickup" ? pickupSpotId : undefined,
+          payment: paymentMethod,
           paymentMethod,
           bonusAmount: bonusUsed || 0,
           promoCode: promoCode.trim() || undefined,
@@ -1631,18 +1636,47 @@ export default function CheckoutPage() {
                       checked={paymentMethod === "cash"}
                       onChange={() => setPaymentMethod("cash")}
                     />
-                    <span>{copy.paymentCash}</span>
+                    <span className="checkout-payment__content">
+                      <span className="checkout-payment__name">{copy.paymentCash}</span>
+                    </span>
                   </label>
                   <label
-                    className={`checkout-payment__option${paymentMethod === "card" ? " is-active" : ""}`}
+                    className={`checkout-payment__option${paymentMethod === "click" ? " is-active" : ""}`}
                   >
                     <input
                       type="radio"
                       name="payment"
-                      checked={paymentMethod === "card"}
-                      onChange={() => setPaymentMethod("card")}
+                      checked={paymentMethod === "click"}
+                      onChange={() => setPaymentMethod("click")}
                     />
-                    <span>{copy.paymentCard}</span>
+                    <span className="checkout-payment__content checkout-payment__content--click">
+                      <span className="checkout-payment__logo-box checkout-payment__logo-box--click">
+                        <img
+                          className="checkout-payment__logo checkout-payment__logo--click"
+                          src="/icons/click.png"
+                          alt="Click"
+                        />
+                      </span>
+                    </span>
+                  </label>
+                  <label
+                    className={`checkout-payment__option${paymentMethod === "payme" ? " is-active" : ""}`}
+                  >
+                    <input
+                      type="radio"
+                      name="payment"
+                      checked={paymentMethod === "payme"}
+                      onChange={() => setPaymentMethod("payme")}
+                    />
+                    <span className="checkout-payment__content checkout-payment__content--payme">
+                      <span className="checkout-payment__logo-box checkout-payment__logo-box--payme">
+                        <img
+                          className="checkout-payment__logo checkout-payment__logo--payme"
+                          src="/icons/payme.png"
+                          alt="Payme"
+                        />
+                      </span>
+                    </span>
                   </label>
                 </div>
               </div>

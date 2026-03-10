@@ -11,7 +11,7 @@ const COPY: Record<Locale, { title: string; subtitle: string; body: string; seoT
     subtitle: "Коротко о правилах доставки и способах оплаты.",
     body:
       "• Среднее время доставки — около 35–45 минут.\n" +
-      "• Оплата: онлайн, наличными или картой курьеру.\n" +
+      "• Оплата: Click, Payme или наличными.\n" +
       "• Мы принимаем заказы ежедневно с 10:00 до 23:00.",
     seoTitle: "Доставка и оплата Wasabi Sushi",
     seoDescription: "Условия доставки и оплаты Wasabi Sushi.",
@@ -22,7 +22,7 @@ const COPY: Record<Locale, { title: string; subtitle: string; body: string; seoT
     subtitle: "Yetkazib berish qoidalari va to'lov usullari.",
     body:
       "• O'rtacha yetkazish vaqti — 35–45 daqiqa.\n" +
-      "• To'lov: onlayn, naqd yoki karta orqali.\n" +
+      "• To'lov: Click, Payme yoki naqd.\n" +
       "• Buyurtmalar har kuni 10:00 dan 23:00 gacha qabul qilinadi.",
     seoTitle: "Wasabi Sushi yetkazish va to'lov",
     seoDescription: "Wasabi Sushi yetkazib berish va to'lov shartlari.",
