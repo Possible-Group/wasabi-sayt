@@ -179,10 +179,7 @@ function getPosterPaymentMethod(method: string) {
 }
 
 function getOrderApiPaymentMethodLabel(method: string) {
-  if (method === "cash") return "Наличными";
-  if (method === "click") return "Click";
-  if (method === "payme") return "Payme";
-  return "Карта";
+  return method === "cash" ? "Наличными" : "Карта";
 }
 
 function getPaymentBreakdown(total: number, method: string) {
@@ -420,7 +417,8 @@ export async function POST(req: Request) {
   });
 
   const customerComment = String(body.comment ?? "").trim();
-  const orderComment = customerComment || undefined;
+  const paymentComment = paymentMethod === "click" ? "Click" : paymentMethod === "payme" ? "Payme" : "";
+  const orderComment = joinOrderNotes(customerComment, paymentComment);
   const serviceComment = joinOrderNotes(
     String(body.serviceNote ?? ""),
     chopsticksIncluded ? "" : "Без палочек"
