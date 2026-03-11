@@ -416,13 +416,6 @@ export async function POST(req: Request) {
     };
   });
 
-  const customerComment = String(body.comment ?? "").trim();
-  const paymentComment = paymentMethod === "click" ? "Click" : paymentMethod === "payme" ? "Payme" : "";
-  const orderComment = joinOrderNotes(customerComment, paymentComment);
-  const serviceComment = joinOrderNotes(
-    String(body.serviceNote ?? ""),
-    chopsticksIncluded ? "" : "Без палочек"
-  );
   const posterPaymentMethod = getPosterPaymentMethod(paymentMethod);
   const posterSpots = spotId
     ? await cached("poster:spots", 60_000, () => posterFetch<{ response?: PosterSpot[] }>("spots.getSpots"))
@@ -433,6 +426,22 @@ export async function POST(req: Request) {
       )?.name ||
       ""
     : "";
+  const customerComment = String(body.comment ?? "").trim();
+  const paymentComment = `Метод оплаты выбрали - ${paymentLabel(paymentMethod)}`;
+  const locationComment =
+    deliveryType === "delivery"
+      ? address
+        ? `Адрес - ${address}`
+        : ""
+      : spotName
+      ? `Филиал - ${spotName}`
+      : "";
+  const clientComment = customerComment ? `Комментарий клиента - ${customerComment}` : "";
+  const orderComment = joinOrderNotes(paymentComment, locationComment, clientComment);
+  const serviceComment = joinOrderNotes(
+    String(body.serviceNote ?? ""),
+    chopsticksIncluded ? "" : "Без палочек"
+  );
 
   const orderPayload = {
     service_mode: serviceMode,
