@@ -428,16 +428,10 @@ export async function POST(req: Request) {
     : "";
   const customerComment = String(body.comment ?? "").trim();
   const paymentComment = `Метод оплаты выбрали - ${paymentLabel(paymentMethod)}`;
-  const locationComment =
-    deliveryType === "delivery"
-      ? address
-        ? `Адрес - ${address}`
-        : ""
-      : spotName
-      ? `Филиал - ${spotName}`
-      : "";
-  const clientComment = customerComment ? `Комментарий клиента - ${customerComment}` : "";
-  const orderComment = joinOrderNotes(paymentComment, locationComment, clientComment);
+  const sanitizedCustomerComment =
+    customerComment && customerComment !== address && customerComment !== spotName ? customerComment : "";
+  const clientComment = sanitizedCustomerComment ? `Комментарий клиента - ${sanitizedCustomerComment}` : "";
+  const orderComment = joinOrderNotes(paymentComment, clientComment);
   const serviceComment = joinOrderNotes(
     String(body.serviceNote ?? ""),
     chopsticksIncluded ? "" : "Без палочек"
