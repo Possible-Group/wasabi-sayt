@@ -89,6 +89,10 @@ const COPY = {
     mapSearchError: "Не удалось выполнить поиск адреса.",
     mapLoading: "Загружаем карту...",
     mapError: "Не удалось загрузить карту. Попробуйте позже.",
+    addressEntrance: "Подъезд",
+    addressFloor: "Этаж",
+    addressApartment: "Квартира, офис",
+    addressIntercom: "Домофон",
     myLocation: "Мое местоположение",
     myLocationLoading: "Определяем...",
     myLocationError: "Не удалось определить местоположение.",
@@ -156,6 +160,10 @@ const COPY = {
     mapSearchError: "Manzilni qidirib bo'lmadi.",
     mapLoading: "Xarita yuklanmoqda...",
     mapError: "Xaritani yuklab bo'lmadi. Keyinroq urinib ko'ring.",
+    addressEntrance: "Podyezd",
+    addressFloor: "Qavat",
+    addressApartment: "Kvartira, ofis",
+    addressIntercom: "Domofon",
     myLocation: "Mening joylashuvim",
     myLocationLoading: "Aniqlanmoqda...",
     myLocationError: "Joylashuvni aniqlab bo'lmadi.",
@@ -405,6 +413,10 @@ export default function CheckoutPage() {
   const [phone, setPhone] = useState("");
   const [name, setName] = useState("");
   const [address, setAddress] = useState("");
+  const [addressEntrance, setAddressEntrance] = useState("");
+  const [addressFloor, setAddressFloor] = useState("");
+  const [addressApartment, setAddressApartment] = useState("");
+  const [addressIntercom, setAddressIntercom] = useState("");
   const [promoCode, setPromoCode] = useState("");
   const [comment, setComment] = useState("");
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("click");
@@ -1227,9 +1239,25 @@ export default function CheckoutPage() {
     }
   }, [deliveryDate, deliveryTimeOpen, minOtherDeliveryDate]);
 
+  function buildAddressDetailsComment() {
+    return [
+      [copy.addressEntrance, addressEntrance],
+      [copy.addressFloor, addressFloor],
+      [copy.addressApartment, addressApartment],
+      [copy.addressIntercom, addressIntercom],
+    ]
+      .map(([label, value]) => {
+        const trimmed = value.trim();
+        return trimmed ? `${label}: ${trimmed}` : "";
+      })
+      .filter(Boolean)
+      .join(", ");
+  }
+
   function buildOrderComment() {
     const value = comment.trim();
-    return value || undefined;
+    const addressDetails = deliveryType === "delivery" ? buildAddressDetailsComment() : "";
+    return [value, addressDetails].filter(Boolean).join("\n") || undefined;
   }
 
   function buildOrderServiceNote() {
@@ -1538,6 +1566,45 @@ export default function CheckoutPage() {
                       onChange={(e) => setAddress(e.target.value)}
                     />
                   </label>
+
+                  <div className="checkout-grid">
+                    <label className="checkout-field">
+                      {copy.addressEntrance}
+                      <input
+                        className="checkout-input"
+                        placeholder={copy.addressEntrance}
+                        value={addressEntrance}
+                        onChange={(e) => setAddressEntrance(e.target.value)}
+                      />
+                    </label>
+                    <label className="checkout-field">
+                      {copy.addressApartment}
+                      <input
+                        className="checkout-input"
+                        placeholder={copy.addressApartment}
+                        value={addressApartment}
+                        onChange={(e) => setAddressApartment(e.target.value)}
+                      />
+                    </label>
+                    <label className="checkout-field">
+                      {copy.addressFloor}
+                      <input
+                        className="checkout-input"
+                        placeholder={copy.addressFloor}
+                        value={addressFloor}
+                        onChange={(e) => setAddressFloor(e.target.value)}
+                      />
+                    </label>
+                    <label className="checkout-field">
+                      {copy.addressIntercom}
+                      <input
+                        className="checkout-input"
+                        placeholder={copy.addressIntercom}
+                        value={addressIntercom}
+                        onChange={(e) => setAddressIntercom(e.target.value)}
+                      />
+                    </label>
+                  </div>
 
                   <div className="checkout-location-actions">
                     <button
