@@ -93,6 +93,8 @@ const COPY = {
     addressFloor: "Этаж",
     addressApartment: "Квартира, офис",
     addressIntercom: "Домофон",
+    packageCount: "Пакеты",
+    chopsticksCount: "Палочки",
     myLocation: "Мое местоположение",
     myLocationLoading: "Определяем...",
     myLocationError: "Не удалось определить местоположение.",
@@ -164,6 +166,8 @@ const COPY = {
     addressFloor: "Qavat",
     addressApartment: "Kvartira, ofis",
     addressIntercom: "Domofon",
+    packageCount: "Paketlar",
+    chopsticksCount: "Tayoqchalar",
     myLocation: "Mening joylashuvim",
     myLocationLoading: "Aniqlanmoqda...",
     myLocationError: "Joylashuvni aniqlab bo'lmadi.",
@@ -1123,6 +1127,7 @@ export default function CheckoutPage() {
   const packagePriceT = Math.round(fees.pack * 100);
   const chopsticksPriceT = 0;
   const packageItem = items.find(isPackageItem) || null;
+  const chopsticksItem = items.find(isChopsticksItem) || null;
   const productItems = items.filter((it) => !isExtraItem(it));
   const hasProducts = productItems.length > 0;
   const itemsSubtotalT = getItemsSubtotal(items);
@@ -1254,10 +1259,15 @@ export default function CheckoutPage() {
       .join(", ");
   }
 
+  function buildExtrasDetailsComment() {
+    return `${copy.packageCount}: ${Math.max(0, Math.floor(packageItem?.qty ?? 0))}, ${copy.chopsticksCount}: ${Math.max(0, Math.floor(chopsticksItem?.qty ?? 0))}`;
+  }
+
   function buildOrderComment() {
     const value = comment.trim();
     const addressDetails = deliveryType === "delivery" ? buildAddressDetailsComment() : "";
-    return [value, addressDetails].filter(Boolean).join("\n") || undefined;
+    const extrasDetails = buildExtrasDetailsComment();
+    return [value, addressDetails, extrasDetails].filter(Boolean).join("\n") || undefined;
   }
 
   function buildOrderServiceNote() {
