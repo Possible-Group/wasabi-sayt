@@ -237,6 +237,17 @@ function parsePopularIds(raw?: string | null) {
   return [];
 }
 
+function compareConfiguredOrder(
+  leftOrder: number | null | undefined,
+  rightOrder: number | null | undefined,
+  leftIndex: number,
+  rightIndex: number
+) {
+  const leftPosition = typeof leftOrder === "number" ? leftOrder : leftIndex + 1;
+  const rightPosition = typeof rightOrder === "number" ? rightOrder : rightIndex + 1;
+  return leftPosition - rightPosition || leftIndex - rightIndex;
+}
+
 function slugify(value: string) {
   return value
     .toLowerCase()
@@ -532,18 +543,7 @@ export default async function HomePage({
           index: idx,
           sortOrder: categorySortMap.get(item.id) ?? null,
         }))
-        .sort((a, b) => {
-          const aHas = a.sortOrder !== null && a.sortOrder !== undefined;
-          const bHas = b.sortOrder !== null && b.sortOrder !== undefined;
-          if (aHas && bHas) {
-            const aSortOrder = a.sortOrder ?? 0;
-            const bSortOrder = b.sortOrder ?? 0;
-            return aSortOrder - bSortOrder || a.index - b.index;
-          }
-          if (aHas) return -1;
-          if (bHas) return 1;
-          return a.index - b.index;
-        })
+        .sort((a, b) => compareConfiguredOrder(a.sortOrder, b.sortOrder, a.index, b.index))
         .map(({ id, title }) => ({ id, title }));
 
       return ordered;
@@ -594,17 +594,12 @@ export default async function HomePage({
     const order = productSortMap.get(item.id);
     return typeof order === "number" ? order : null;
   };
-  const getProductIndex = (item: ProductCard) => productIndex.get(item.id) ?? 0;
   for (const list of grouped.values()) {
+    const listIndex = new Map(list.map((item, idx) => [item.id, idx] as const));
     list.sort((a, b) => {
-      const aOrder = getProductOrder(a);
-      const bOrder = getProductOrder(b);
-      const aHas = aOrder !== null && aOrder !== undefined;
-      const bHas = bOrder !== null && bOrder !== undefined;
-      if (aHas && bHas) return aOrder - bOrder || getProductIndex(a) - getProductIndex(b);
-      if (aHas) return -1;
-      if (bHas) return 1;
-      return getProductIndex(a) - getProductIndex(b);
+      const aIndex = listIndex.get(a.id) ?? productIndex.get(a.id) ?? 0;
+      const bIndex = listIndex.get(b.id) ?? productIndex.get(b.id) ?? 0;
+      return compareConfiguredOrder(getProductOrder(a), getProductOrder(b), aIndex, bIndex);
     });
   }
   const orderedGroups = [
